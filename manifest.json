@@ -1,0 +1,23 @@
+{
+  "name": "PARTIDOS GUARDIANLAB",
+  "short_name": "PARTIDOS GUARDIANLAB",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#111a36",
+  "theme_color": "#1C2C5B",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "GuardianLab-en vivo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "GuardianLab-en vivo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
