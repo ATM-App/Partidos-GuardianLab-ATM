@@ -17,13 +17,14 @@ try {
 } catch(e) { console.error("Error Firebase", e); }
 
 const db = firebase.firestore();
+const auth = firebase.auth(); // NUEVO: Inicializar Autenticación
 
 // HELPERS DB
 function dbSave(storeName, data) {
     const id = String(data.id || Date.now());
     return db.collection(storeName).doc(id).set(data)
         .then(() => true)
-        .catch(err => { console.error(err); return false; });
+        .catch(err => { console.error("Error guardando:", err); return false; });
 }
 
 function dbGetAll(storeName) {
@@ -31,11 +32,11 @@ function dbGetAll(storeName) {
         const list = [];
         snap.forEach(doc => list.push(doc.data()));
         return list;
-    });
+    }).catch(err => { console.error("Error leyendo:", err); return []; });
 }
 
 function dbDelete(storeName, id) {
-    return db.collection(storeName).doc(String(id)).delete();
+    return db.collection(storeName).doc(String(id)).delete().catch(err => console.error(err));
 }
 
 // --- VARIABLES GLOBALES ---
@@ -56,17 +57,32 @@ let CATALOGO_ACCIONES = {
 
 let ACCIONES_EVALUACION = {
     "DEFENSIVAS": ["Blocaje Frontales Medio y Raso", "Blocaje lateral raso", "Blocaje lateral media altura", "Desvío raso", "Desvío a Media Altura", "Reducción de espacios y Posición Cruz", "Apertura", "Reincorporaciones", "Blocaje Aéreo", "Despeje de Puños"],
-    "OFENSIVAS": ["Pase mano raso", "Pase mano alto", "Pase mano picado", "Perfilamiento y Controles", "Pase Raso con el Píe", "Pase alto con el Píe", "Voleas"]
+    "OFENSIVAS": ["Pase mano raso", "Pase mano Alto", "Pase mano picado", "Perfilamiento y Controles", "Pase Raso con el Píe", "Pase alto con el Píe", "Voleas"]
 };
 
 let categoriaAccionActiva = "DEFENSIVAS";
 
 // --- INICIO ---
 document.addEventListener('DOMContentLoaded', () => {
-    cargarPorteros();
-    cargarPartidosHistorial();
-    cargarHistorialReportes();
-    cargarConceptosPersonalizados();
+    
+    // NUEVA LÓGICA DE AUTENTICACIÓN
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            console.log("Sesión segura iniciada:", user.uid);
+            // Solo cargar datos si estamos autenticados (para no romper reglas Firebase)
+            cargarPorteros();
+            cargarPartidosHistorial();
+            cargarHistorialReportes();
+            cargarConceptosPersonalizados();
+        } else {
+            console.log("Iniciando conexión segura...");
+            auth.signInAnonymously().catch((error) => {
+                console.error("Error de conexión segura:", error.code, error.message);
+                alert("Error de conexión. Revisa tu internet.");
+            });
+        }
+    });
+
     recuperarPartidoEnCurso();
     
     const today = new Date().toISOString().split('T')[0];
@@ -87,7 +103,7 @@ window.alternarTema = function() { document.body.classList.toggle('light-mode');
 window.cambiarSeccion = function(sec) {
     document.getElementById('modal-pdf-preview').style.display = 'none';
     document.getElementById('modal-fin-partido').style.display = 'none';
-    ['porteros','sesiones','partidos','conceptos','datos','live'].forEach(id => {
+    ['porteros','sesiones','partidos','conceptos','live'].forEach(id => {
         const secEl = document.getElementById('section-'+id);
         const btnEl = document.getElementById('btn-'+id);
         if(secEl) secEl.style.display = 'none';
@@ -186,7 +202,7 @@ function cargarPorteros() {
             c.innerHTML += `<div class="portero-card"><div style="display:flex; align-items:center;"><img src="${p.foto||def}" class="mini-foto-list"><div><div class="card-title">${p.nombre}</div><div class="card-subtitle">${p.equipo} (${p.anio||'-'})</div></div></div><div><button class="btn-icon-action" onclick="window.cargarDatosEdicion('${p.id}')">✏️</button><button class="btn-trash" onclick="window.borrarPortero('${p.id}')">🗑️</button></div></div>`;
         });
         const opts = '<option value="">Seleccionar...</option>' + lista.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
-        ['obj-portero', 'conf-portero-titular', 'select-stats-portero'].forEach(id => {
+        ['obj-portero', 'conf-portero-titular'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.innerHTML = opts;
         });
@@ -212,7 +228,6 @@ window.procesarPortero = function() {
     };
 
     if(file) {
-        // COMPRESOR (SOLUCIÓN TABLET)
         const r = new FileReader();
         r.onload = (e) => {
             const img = new Image();
@@ -250,12 +265,12 @@ window.cancelarEdicion = function() {
 }
 window.borrarPortero = function(id) { if(confirm("¿Borrar?")) db.collection("porteros").doc(id).delete(); }
 
-// --- OBJETIVOS (LISTA LIMPIA) ---
+// --- OBJETIVOS ---
 window.resetearEvaluacionTemporal = function() {
     evaluacionesTemporales = []; competenciaSeleccionada = null; window.selectCompetencia(null);
     window.renderizarListaTemporal(); 
     document.getElementById('contenedor-evaluacion-temporal').style.display = 'none'; 
-    document.getElementById('obj-observacion').value = ''; // Limpiar observación
+    document.getElementById('obj-observacion').value = ''; 
     window.cargarAccionesObjetivos();
 }
 window.cargarAccionesObjetivos = function() {
@@ -287,10 +302,9 @@ window.renderizarListaTemporal = function() {
         cont.innerHTML += `<div class="item-temp-eval" style="border-left: 4px solid ${col}"><strong>${item.accion}</strong><br><span style="color:${col}">${txt}</span> | Nota: ${item.puntaje}</div>`;
     });
 }
-// GUARDAR INCLUYENDO OBSERVACIÓN
 window.guardarReporteCompleto = function() {
     const pid = document.getElementById('obj-portero').value; const fecha = document.getElementById('obj-fecha').value;
-    const observacion = document.getElementById('obj-observacion').value; // Capturar texto
+    const observacion = document.getElementById('obj-observacion').value;
 
     if(!pid || !fecha || evaluacionesTemporales.length === 0) return alert("Sin datos");
     const reporteID = String(Date.now());
@@ -305,7 +319,7 @@ window.guardarReporteCompleto = function() {
         batch.commit(); generarPDFReporteLote(reporte); window.resetearEvaluacionTemporal();
     });
 }
-// FIX: PDF TÍTULO, NOTA MEDIA Y OBSERVACIÓN FINAL
+
 function generarPDFReporteLote(reporte) {
     db.collection("porteros").doc(reporte.porteroId).get().then(doc => {
         const p = doc.data(); const foto = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4=";
@@ -319,7 +333,6 @@ function generarPDFReporteLote(reporte) {
         });
         const media = (sum / reporte.acciones.length).toFixed(1);
         
-        // BLOQUE HTML OBSERVACIÓN
         const obsHtml = reporte.observacion ? 
             `<div class="pdf-obs-box" style="margin-top:20px; border: 1px solid #ddd; background: #f9f9f9; padding:10px;">
                 <div class="pdf-obs-header" style="color:#CB3524; font-weight:bold; border-bottom:1px solid #ccc; padding-bottom:5px; margin-bottom:5px;">OBSERVACIÓN FINAL DEL SEGUIMIENTO DE OBJETIVOS</div>
@@ -343,7 +356,6 @@ function cargarHistorialReportes() {
     });
 }
 window.verPDFReporteObj = function(id) { db.collection("reportes").doc(String(id)).get().then(doc => { if(doc.exists) generarPDFReporteLote(doc.data()); }); }
-// FIX: BORRAR DATOS FANTASMA
 window.borrarReporte = function(id) { 
     if(confirm("¿Borrar?")) {
         db.collection("reportes").doc(String(id)).delete();
@@ -353,47 +365,6 @@ window.borrarReporte = function(id) {
             batch.commit();
         });
     }
-}
-// CORRECCIÓN DATOS FANTASMA: FILTRAR POR REPORTES ACTIVOS
-window.actualizarGrafica = async function() {
-    const pid = document.getElementById('select-stats-portero').value; 
-    if(!pid) return;
-    
-    // 1. Obtener IDs de reportes VIGENTES (no borrados)
-    const reportesSnap = await db.collection("reportes").where("porteroId", "==", pid).get();
-    const reportesActivos = new Set();
-    reportesSnap.forEach(doc => reportesActivos.add(doc.id));
-
-    // 2. Obtener seguimientos
-    const snap = await db.collection("seguimientos").where("porteroId", "==", pid).get();
-    let raw = [];
-    snap.forEach(d => {
-        const data = d.data();
-        // Solo añadir si su reporte padre existe
-        if(reportesActivos.has(data.reporteId)) {
-            raw.push(data);
-        }
-    });
-
-    raw.sort((a,b) => new Date(a.fecha) - new Date(b.fecha)); // Orden local
-    
-    const dataPoints = []; const labels = []; let total = 0;
-    // Graficar ultimos 50 validos
-    const finalData = raw.slice(-50);
-    
-    finalData.forEach(d => { 
-        dataPoints.push(d.puntaje); 
-        labels.push(d.fecha.substring(5)); 
-        total += parseInt(d.puntaje); 
-    });
-    
-    const media = finalData.length ? (total/finalData.length).toFixed(1) : "0.0"; 
-    
-    document.getElementById('kpi-media').innerText = media; 
-    document.getElementById('kpi-clean-sheets').innerText = reportesActivos.size; // Total reportes
-    
-    const ctx = document.getElementById('graficaRendimiento').getContext('2d'); if(window.myChart) window.myChart.destroy();
-    window.myChart = new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [{ label: 'Puntaje', data: dataPoints, borderColor: '#CB3524', backgroundColor: 'rgba(203,53,36,0.1)', tension: 0.4, fill: true }] }, options: { scales: { y: { min: 0, max: 5 } }, plugins: { legend: { display: false } } } });
 }
 
 // --- LIVE MATCH ---
@@ -429,8 +400,8 @@ window.iniciarLivePro = function() {
 window.actualizarUI = function() {
     if(!partidoLive.porteroActualId) return;
     document.getElementById('live-portero-nombre').innerText = "Cargando...";
-    db.collection("porteros").doc(partidoLive.porteroActualId).get().then(doc => {
-        if(doc.exists) { const p = doc.data(); document.getElementById('live-portero-nombre').innerText = p.nombre; document.getElementById('live-portero-foto').src = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIwIDIxdi0yYTQgNCAwIDAgMC00LTRoLThhNCA0IDAgMCAwLTQgNHYyIi8+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0Ii8+PC9zdmc+"; }
+    db.collection("porteros").doc(String(partidoLive.porteroActualId)).get().then(doc => {
+        if(doc.exists) { const p = doc.data(); document.getElementById('live-portero-nombre').innerText = p.nombre; document.getElementById('live-portero-foto').src = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4="; }
     });
 }
 window.controlCrono = function(act) {
@@ -446,7 +417,6 @@ window.controlCrono = function(act) {
                     if(!partidoLive.minutosJugados[partidoLive.porteroActualId]) partidoLive.minutosJugados[partidoLive.porteroActualId] = 0;
                     partidoLive.minutosJugados[partidoLive.porteroActualId] += delta;
                     c.lastUpdate = now;
-                    // Update UI Minutos
                     const m = Math.floor(partidoLive.minutosJugados[partidoLive.porteroActualId] / 60);
                     const elM = document.getElementById('live-minutos');
                     if(elM) elM.innerText = `⏱️ ${m}'`;
@@ -482,7 +452,6 @@ window.renderizarPanelAcciones = function() {
     Object.keys(gr).forEach(gName => {
         const tit = document.createElement('div'); tit.className='action-group-title'; tit.innerText=gName; panel.appendChild(tit);
         const grid = document.createElement('div'); grid.className='actions-grid-new';
-        // MOSTRAR TAMBIEN ACCIONES PERSONALIZADAS SI EXISTEN
         let acciones = gr[gName];
         acciones.forEach(act => { const b = document.createElement('button'); b.innerText=act; b.className=`action-btn-new btn-${catId}`; b.onclick = () => window.prepararAccion(act); grid.appendChild(b); });
         panel.appendChild(grid);
@@ -612,10 +581,10 @@ function cargarPartidosHistorial() {
         if(partidoLive.parteActual !== 'Pre-Partido' && partidoLive.parteActual !== 'Final'){ liveBanner.style.display = 'block'; } else { liveBanner.style.display = 'none'; }
     });
 }
-window.verPDFHistorial = function(id) { db.collection("partidos").doc(id).get().then(doc => { if(doc.exists) { document.getElementById('preview-content').innerHTML = doc.data().htmlData; document.getElementById('printable-area').innerHTML = doc.data().htmlData; document.getElementById('modal-pdf-preview').style.display = 'flex'; } }); }
-window.borrarHistorial = function(id) { if(confirm("¿Borrar?")) db.collection("partidos").doc(id).delete(); }
+window.verPDFHistorial = function(id) { db.collection("partidos").doc(String(id)).get().then(doc => { if(doc.exists) { document.getElementById('preview-content').innerHTML = doc.data().htmlData; document.getElementById('printable-area').innerHTML = doc.data().htmlData; document.getElementById('modal-pdf-preview').style.display = 'flex'; } }); }
+window.borrarHistorial = function(id) { if(confirm("¿Borrar?")) db.collection("partidos").doc(String(id)).delete(); }
 window.abrirEdicionAnalisis = function(id) {
-    db.collection("partidos").doc(id).get().then(doc => {
+    db.collection("partidos").doc(String(id)).get().then(doc => {
         if(!doc.exists) return;
         partidoEnEdicion = { ...doc.data(), id: doc.id };
         const container = document.getElementById('container-editar-analisis'); container.innerHTML = '';
@@ -638,6 +607,6 @@ window.guardarEdicionAnalisis = function() {
         partidoEnEdicion.raw.porterosJugaron.forEach(pid => { newAna[pid] = { pos: document.getElementById('edit_pos_'+pid).value, neg: document.getElementById('edit_neg_'+pid).value, tras: document.getElementById('edit_tras_'+pid).value }; });
         partidoEnEdicion.raw.analisis = newAna;
         const newHtml = generarHTMLPartido(partidoEnEdicion.raw, ps, newAna);
-        db.collection("partidos").doc(partidoEnEdicion.id).update({ raw: partidoEnEdicion.raw, htmlData: newHtml }).then(() => { alert("Actualizado"); document.getElementById('modal-editar-analisis').style.display='none'; });
+        db.collection("partidos").doc(String(partidoEnEdicion.id)).update({ raw: partidoEnEdicion.raw, htmlData: newHtml }).then(() => { alert("Actualizado"); document.getElementById('modal-editar-analisis').style.display='none'; });
     });
 }

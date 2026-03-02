@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PARTIDOS GUARDIANLAB</title>
+    <title>Guardian Lab - ATM Pro</title>
     
     <link rel="icon" href="GuardianLab-en vivo.png" type="image/png">
     <link rel="shortcut icon" href="GuardianLab-en vivo.png" type="image/png">
@@ -16,6 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
@@ -56,7 +57,7 @@
                 <button onclick="window.procesarPortero()" id="btn-save" class="btn-main">Añadir Jugador</button>
                 <button onclick="window.cancelarEdicion()" id="btn-cancel" class="btn-main" style="display:none; background:#555; margin-top:10px;">Cancelar Edición</button>
             </div>
-            <div id="lista-porteros" class="list-vertical"><div style="text-align:center; padding:20px; color:#aaa;">Cargando nube...</div></div>
+            <div id="lista-porteros" class="list-vertical"><div style="text-align:center; padding:20px; color:#aaa;">Cargando nube segura...</div></div>
         </section>
 
         <section id="section-sesiones" class="fade-in" style="display:none;">
@@ -154,6 +155,7 @@
             <h3 class="section-divider">Mis Acciones Personalizadas</h3>
             <div id="lista-conceptos-custom" class="list-vertical"></div>
         </section>
+
     </main>
 
     <div id="modal-config-partido" class="modal">
