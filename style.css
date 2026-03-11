@@ -108,23 +108,35 @@ body.light-mode .fab-center { border-color: #f4f6f8; }
 .fab-center:active { transform: translateX(-50%) scale(0.9); }
 .fab-center.active { border-color: #00ff88; box-shadow: 0 0 20px rgba(0,255,136,0.4); }
 
+/* --- PÍLDORA MINUTOS JUGADOS (MEJORA VISUAL) --- */
+.badge-minutes { 
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(10, 15, 36, 0.85); color: #00ff88; 
+    padding: 5px 15px; border-radius: 30px; 
+    font-size: 1.05rem; font-weight: 800; font-family: monospace; 
+    border: 1px solid rgba(0, 255, 136, 0.4); box-shadow: 0 4px 10px rgba(0,0,0,0.2); 
+    width: fit-content; 
+}
+body.light-mode .badge-minutes { background: #1C2C5B; }
+
 /* --- GRID CAMBIOS PORTEROS --- */
 .subs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; margin-top: 15px; }
-.sub-card { background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: var(--radius-m); padding: 15px; text-align: center; cursor: pointer; transition: 0.2s; }
-.sub-card img { width: 65px; height: 65px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; border: 2px solid var(--text-sec); }
+.sub-card { background: rgba(128,128,128,0.1); border: 2px solid transparent; border-radius: var(--radius-m); padding: 15px; text-align: center; cursor: pointer; transition: 0.2s; }
+.sub-card img { width: 65px; height: 65px; border-radius: 50%; object-fit: cover; margin-bottom: 5px; border: 2px solid var(--text-sec); }
 .sub-card.selected { border-color: var(--atm-red); background: rgba(203,53,36,0.1); }
 .sub-card.selected img { border-color: var(--atm-red); }
+/* Letra siempre visible sea cual sea el tema */
+.sub-card-name { font-weight: bold; font-size: 0.85rem; color: var(--text-main); margin-top: 5px; }
 
 /* --- SELECTOR DE ICONOS (CONCEPTOS) --- */
 .icon-selector { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
-.icon-opt { width: 45px; height: 45px; border-radius: 50%; background: rgba(255,255,255,0.05); display: flex; justify-content: center; align-items: center; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
-.icon-opt:hover { background: rgba(255,255,255,0.15); }
+.icon-opt { width: 45px; height: 45px; border-radius: 50%; background: rgba(128,128,128,0.1); display: flex; justify-content: center; align-items: center; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+.icon-opt:hover { background: rgba(128,128,128,0.2); }
 .icon-opt.selected { border-color: #00ff88; background: rgba(0,255,136,0.1); color: #00ff88; }
 .icon-opt .material-symbols-outlined { font-size: 24px; }
 
 /* --- ACCIONES LIVE --- */
-.mini-foto-live { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--atm-red); }
-.badge-minutes { color: #f1c40f; font-size: 0.9rem; font-weight: bold; font-family: monospace; }
+.mini-foto-live { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid var(--atm-red); }
 .section-divider { font-size: 0.9rem; margin: 20px 0 10px; border-bottom: 1px solid var(--text-sec); padding-bottom: 5px; color: var(--text-sec); }
 .log-item { padding: 8px; border-bottom: 1px solid rgba(128,128,128,0.1); font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; color: var(--text-main); }
 .log-ok { border-left: 3px solid #00ff88; } .log-error { border-left: 3px solid var(--atm-red); }
