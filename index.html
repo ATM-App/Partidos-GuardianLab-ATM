@@ -60,40 +60,6 @@
             <div id="lista-porteros" class="list-vertical"><div style="text-align:center; padding:20px; color:#aaa;">Cargando nube segura...</div></div>
         </section>
 
-        <section id="section-sesiones" class="fade-in" style="display:none;">
-            <div class="section-header"><h2>Seguimiento de Objetivos</h2></div>
-            <div class="modern-card form-card">
-                <div class="row">
-                    <select id="obj-portero" class="full-width" style="border: 1px solid var(--atm-red); font-weight:bold; flex:2" onchange="window.resetearEvaluacionTemporal()"><option value="">Seleccionar Portero...</option></select>
-                    <input type="date" id="obj-fecha" style="flex:1">
-                </div>
-                <div class="row" style="margin-top: 15px;">
-                    <select id="obj-tipo" class="full-width" onchange="window.cargarAccionesObjetivos()"><option value="">Tipo de Acción...</option><option value="DEFENSIVAS">Acciones Defensivas</option><option value="OFENSIVAS">Acciones Ofensivas</option></select>
-                </div>
-                <select id="obj-accion" class="full-width" disabled><option value="">Selecciona Tipo primero...</option></select>
-                <label style="font-size:0.8rem; color:var(--text-sec); margin-top:10px; display:block;">Nivel de Competencia:</label>
-                <div class="competencia-selector">
-                    <button class="btn-comp comp-1" onclick="window.selectCompetencia(1)">Incomp. Inconsciente</button><button class="btn-comp comp-2" onclick="window.selectCompetencia(2)">Incomp. Consciente</button><button class="btn-comp comp-3" onclick="window.selectCompetencia(3)">Comp. Consciente</button><button class="btn-comp comp-4" onclick="window.selectCompetencia(4)">Comp. Inconsciente</button>
-                </div>
-                <input type="hidden" id="obj-competencia-val" value="">
-                <div class="row" style="align-items: center; margin-top:15px;">
-                    <div style="flex:1"><label style="font-size:0.8rem; color:var(--text-sec);">Nota (1-5)</label><input type="number" id="obj-puntaje" min="1" max="5" value="1" style="margin-bottom:0;"></div>
-                    <button onclick="window.agregarEvaluacionTemporal()" class="btn-main" style="flex:2; background: #00ff88; color:black; font-weight:800; border:2px solid white; margin-top:18px;">➕ Añadir a la lista</button>
-                </div>
-            </div>
-            <div id="contenedor-evaluacion-temporal" style="display:none; margin-bottom: 30px;">
-                <h3 class="section-divider" style="color:#00ff88;">Acciones a Registrar</h3>
-                <div id="lista-temp-evaluaciones" class="list-vertical" style="margin-bottom:15px;"></div>
-                
-                <h3 class="section-divider">Observación final del seguimiento de Objetivos</h3>
-                <textarea id="obj-observacion" class="pdf-input-read" placeholder="Escribe aquí la observación..." style="width:100%; height:80px; margin-bottom:15px;"></textarea>
-
-                <button onclick="window.guardarReporteCompleto()" class="btn-main" style="background: linear-gradient(135deg, #00ff88, #00cc6a); color:black; font-weight:800; font-size: 1.1rem;">💾 GUARDAR Y GENERAR INFORME</button>
-            </div>
-            <h3 class="section-divider">Historial de Informes</h3>
-            <div id="lista-seguimientos" class="list-vertical"></div>
-        </section>
-
         <section id="section-partidos" class="fade-in" style="display:none;">
             <div class="section-header"><h2>Match Day</h2><button onclick="window.abrirConfigPartido()" class="btn-small-red">🔴 LIVE PRO</button></div>
             <div id="live-match-banner" style="display:none; margin-bottom: 20px;">
@@ -122,6 +88,7 @@
                             <span id="live-minutos" class="badge-minutes">⏱️ 0'</span>
                         </div>
                     </div>
+                    <button onclick="window.deshacerUltimaAccion()" class="btn-accion-rapida" style="background:#ffaa00; color:black; border:1px solid #cc8800; font-weight:800;">↩️ Deshacer</button>
                     <button onclick="window.abrirModalCambio()" class="btn-accion-rapida" style="background:var(--atm-blue); border:1px solid var(--atm-red)">🔄 Cambio</button>
                 </div>
             </div>
@@ -134,20 +101,14 @@
         <section id="section-conceptos" class="fade-in" style="display:none;">
             <div class="section-header"><h2>Configurar Conceptos</h2></div>
             <div class="modern-card form-card">
-                <p style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">Añade nuevas acciones para Objetivos o Live Pro.</p>
+                <p style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">Añade nuevas acciones para evaluar en el Partido en Vivo.</p>
                 <div class="row">
-                    <input type="text" id="new-concepto-nombre" placeholder="Nombre (ej: Juego de pies)" style="flex:2">
+                    <input type="text" id="new-concepto-nombre" placeholder="Nombre (ej: Salida de puños)" style="flex:2">
                     <select id="new-concepto-tipo" style="flex:2">
-                        <optgroup label="Seguimiento de Objetivos">
-                            <option value="OBJ_DEF">Objetivos - Defensivas</option>
-                            <option value="OBJ_OF">Objetivos - Ofensivas</option>
-                        </optgroup>
-                        <optgroup label="Partido en Vivo (Live)">
-                            <option value="LIVE_DEF">Live - Defensivas</option>
-                            <option value="LIVE_OF">Live - Ofensivas</option>
-                            <option value="LIVE_TAC">Live - Tácticas</option>
-                            <option value="LIVE_REIN">Live - Reincorporaciones</option>
-                        </optgroup>
+                        <option value="LIVE_DEF">Defensivas</option>
+                        <option value="LIVE_OF">Ofensivas</option>
+                        <option value="LIVE_TAC">Tácticas</option>
+                        <option value="LIVE_REIN">Reincorporaciones</option>
                     </select>
                 </div>
                 <button onclick="window.guardarNuevoConcepto()" class="btn-main" style="background:#00ff88; color:black; font-weight:800; border:2px solid white;">Guardar Acción</button>
@@ -156,12 +117,6 @@
             <div id="lista-conceptos-custom" class="list-vertical"></div>
         </section>
 
-        <section id="section-datos" class="fade-in" style="display:none;">
-            <div class="section-header"><h2>Estadísticas</h2></div>
-            <div class="modern-card"><select id="select-stats-portero" onchange="window.actualizarGrafica()" class="full-width"><option value="">-- Elegir Portero --</option></select></div>
-            <div class="kpi-grid"><div class="kpi-card"><div class="kpi-value" id="kpi-media">-</div><div class="kpi-label">Nota Media</div></div><div class="kpi-card"><div class="kpi-value" id="kpi-clean-sheets">-</div><div class="kpi-label">Reportes</div></div></div>
-            <div class="modern-card chart-container"><canvas id="graficaRendimiento"></canvas></div>
-        </section>
     </main>
 
     <div id="modal-config-partido" class="modal">
@@ -186,10 +141,8 @@
 
     <nav class="floating-nav">
         <button onclick="window.cambiarSeccion('porteros')" id="btn-porteros" class="active">Porteros</button>
-        <button onclick="window.cambiarSeccion('sesiones')" id="btn-sesiones">Objetivos</button>
         <button onclick="window.cambiarSeccion('partidos')" id="btn-partidos">Partidos</button>
         <button onclick="window.cambiarSeccion('conceptos')" id="btn-conceptos">+ Conceptos</button>
-        <button onclick="window.cambiarSeccion('datos')" id="btn-datos">Datos</button>
     </nav>
     <div id="printable-area" class="printable-hidden"></div>
     
@@ -198,7 +151,6 @@
     if('serviceWorker' in navigator){
         window.addEventListener('load',()=>{
             navigator.serviceWorker.register('./sw.js')
-            .then(reg=>console.log('SW Registrado', reg))
             .catch(err=>console.log('Error SW',err));
         });
     }
