@@ -104,6 +104,7 @@ function cargarConceptosPersonalizados() {
         const listDiv = document.getElementById('lista-conceptos-custom');
         if(listDiv) listDiv.innerHTML = '';
 
+        // Reset
         CATALOGO_ACCIONES["DEFENSIVAS"].grupos["PERSONALIZADAS"] = [];
         CATALOGO_ACCIONES["OFENSIVAS"].grupos["PERSONALIZADAS"] = [];
         CATALOGO_ACCIONES["TÁCTICAS"].grupos["PERSONALIZADAS"] = [];
@@ -302,7 +303,7 @@ window.controlCrono = function(act) {
                     c.lastUpdate = now;
                     const m = Math.floor(partidoLive.minutosJugados[partidoLive.porteroActualId] / 60);
                     const elM = document.getElementById('live-minutos');
-                    if(elM) elM.innerText = `⏱️ ${m}'`;
+                    if(elM) elM.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">timer</span> ${m}'`;
                 }
             }
         }, 1000);
@@ -346,12 +347,12 @@ window.deshacerUltimaAccion = function() {
     }
 }
 
-// FUNCION PARA ANIMAR EL MARCADOR (FEEDBACK VISUAL GOLES)
+// FUNCION PARA ANIMAR EL MARCADOR
 function animarMarcador(equipo) {
     const el = document.getElementById(`score-${equipo}`);
     const animClass = equipo === 'local' ? 'goal-anim-local' : 'goal-anim-rival';
     el.classList.remove(animClass);
-    void el.offsetWidth; // forzar reflow para reiniciar animacion
+    void el.offsetWidth; // forzar reflow
     el.classList.add(animClass);
     setTimeout(() => el.classList.remove(animClass), 600);
 }
@@ -388,7 +389,6 @@ window.renderizarPanelAcciones = function() {
                 const b = document.createElement('button'); 
                 b.className=`action-btn-new btn-${catId}`; 
                 
-                // Si la acción tiene un icono guardado, se lo añadimos al botón
                 let iconHTML = '';
                 if (iconosPersonalizados[act]) {
                     iconHTML = `<span class="material-symbols-outlined">${iconosPersonalizados[act]}</span>`;
@@ -439,7 +439,7 @@ window.registrarGolContra = function(isError) {
 }
 window.mostrarInputError = function() { document.getElementById('div-error-detalle').style.display='block'; }
 
-// CAMBIO DE PORTERO VISUAL (CUADRÍCULA DE FOTOS)
+// CAMBIO DE PORTERO VISUAL
 window.abrirModalCambio = function() {
     if(!partidoLive.crono.run && partidoLive.parteActual!=='Descanso') return alert("Solo en juego o descanso");
     
@@ -454,10 +454,12 @@ window.abrirModalCambio = function() {
             const p = doc.data(); 
             if(p.equipo === partidoLive.config.equipo && doc.id !== partidoLive.porteroActualId) { 
                 const foto = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4=";
+                
+                // Usamos la nueva clase sub-card-name para asegurar visibilidad en cualquier modo
                 grid.innerHTML += `
                 <div class="sub-card" id="sub-${doc.id}" onclick="window.seleccionarSuplente('${doc.id}')">
                     <img src="${foto}">
-                    <div style="font-weight:bold; font-size:0.8rem; color:white;">${p.nombre}</div>
+                    <div class="sub-card-name">${p.nombre}</div>
                 </div>`; 
                 count++; 
             } 
