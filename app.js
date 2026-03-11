@@ -17,7 +17,7 @@ try {
 } catch(e) { console.error("Error Firebase", e); }
 
 const db = firebase.firestore();
-const auth = firebase.auth(); // NUEVO: Inicializar Autenticación
+const auth = firebase.auth(); 
 
 // HELPERS DB
 function dbSave(storeName, data) {
@@ -43,8 +43,6 @@ function dbDelete(storeName, id) {
 let partidoLive = { config: {}, acciones: [], marcador: {local:0, rival:0}, porterosJugaron: new Set(), minutosJugados: {}, porteroActualId: null, parteActual: 'Pre-Partido', crono: {seg:0, int:null, run:false, startTs:0, savedSeg:0, lastUpdate:0} };
 let accionTemporal = null;
 let porteroEnEdicionId = null;
-let evaluacionesTemporales = [];
-let competenciaSeleccionada = null;
 let partidoEnEdicion = null;
 
 // CATÁLOGOS BASE
@@ -55,27 +53,17 @@ let CATALOGO_ACCIONES = {
     "REINCORPORACIONES": { id: "rein", grupos: { "TIPOS": ["A Posición Básica", "A Mismo Lado", "A Lado Contrario", "Tras Blocaje"], "OTRAS": ["PERSONALIZADAS"] } }
 };
 
-let ACCIONES_EVALUACION = {
-    "DEFENSIVAS": ["Blocaje Frontales Medio y Raso", "Blocaje lateral raso", "Blocaje lateral media altura", "Desvío raso", "Desvío a Media Altura", "Reducción de espacios y Posición Cruz", "Apertura", "Reincorporaciones", "Blocaje Aéreo", "Despeje de Puños"],
-    "OFENSIVAS": ["Pase mano raso", "Pase mano Alto", "Pase mano picado", "Perfilamiento y Controles", "Pase Raso con el Píe", "Pase alto con el Píe", "Voleas"]
-};
-
 let categoriaAccionActiva = "DEFENSIVAS";
 
 // --- INICIO ---
 document.addEventListener('DOMContentLoaded', () => {
     
-    // NUEVA LÓGICA DE AUTENTICACIÓN
     auth.onAuthStateChanged((user) => {
         if (user) {
-            console.log("Sesión segura iniciada:", user.uid);
-            // Solo cargar datos si estamos autenticados (para no romper reglas Firebase)
             cargarPorteros();
             cargarPartidosHistorial();
-            cargarHistorialReportes();
             cargarConceptosPersonalizados();
         } else {
-            console.log("Iniciando conexión segura...");
             auth.signInAnonymously().catch((error) => {
                 console.error("Error de conexión segura:", error.code, error.message);
                 alert("Error de conexión. Revisa tu internet.");
@@ -87,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const today = new Date().toISOString().split('T')[0];
     const fConf = document.getElementById('conf-fecha'); if(fConf) fConf.value=today;
-    const fObj = document.getElementById('obj-fecha'); if(fObj) fObj.value=today;
     
     if(localStorage.getItem('guardian_theme') === 'light'){ document.body.classList.add('light-mode'); }
 });
@@ -100,16 +87,20 @@ window.onbeforeunload = function() {
 
 // --- NAVEGACIÓN ---
 window.alternarTema = function() { document.body.classList.toggle('light-mode'); localStorage.setItem('guardian_theme', document.body.classList.contains('light-mode') ? 'light' : 'dark'); }
+
 window.cambiarSeccion = function(sec) {
     document.getElementById('modal-pdf-preview').style.display = 'none';
     document.getElementById('modal-fin-partido').style.display = 'none';
-    ['porteros','sesiones','partidos','conceptos','live'].forEach(id => {
+    ['porteros','partidos','conceptos','live'].forEach(id => {
         const secEl = document.getElementById('section-'+id);
         const btnEl = document.getElementById('btn-'+id);
         if(secEl) secEl.style.display = 'none';
         if(btnEl) btnEl.classList.remove('active');
     });
-    document.getElementById('section-'+sec).style.display = 'block';
+    
+    const destEl = document.getElementById('section-'+sec);
+    if(destEl) destEl.style.display = 'block';
+    
     const btnDest = document.getElementById('btn-'+sec);
     if(btnDest) btnDest.classList.add('active');
     
@@ -137,24 +128,21 @@ function cargarConceptosPersonalizados() {
         snap.forEach(doc => {
             const c = doc.data();
             let labelType = "";
-            if (c.tipo.startsWith("OBJ_")) {
-                const cat = c.tipo.split("_")[1] === "DEF" ? "DEFENSIVAS" : "OFENSIVAS";
-                if (!ACCIONES_EVALUACION[cat].includes(c.nombre)) ACCIONES_EVALUACION[cat].push(c.nombre);
-                labelType = `Objetivos (${cat})`;
-            } else if (c.tipo.startsWith("LIVE_")) {
+            
+            if (c.tipo.startsWith("LIVE_")) {
                 const map = { "LIVE_DEF": "DEFENSIVAS", "LIVE_OF": "OFENSIVAS", "LIVE_TAC": "TÁCTICAS", "LIVE_REIN": "REINCORPORACIONES" };
                 const cat = map[c.tipo];
                 if (CATALOGO_ACCIONES[cat]) {
                     CATALOGO_ACCIONES[cat].grupos["PERSONALIZADAS"].push(c.nombre);
                 }
                 labelType = `Live Pro (${cat})`;
-            }
 
-            if(listDiv) {
-                listDiv.innerHTML += `<div class="item-temp-eval" style="display:flex;justify-content:space-between;align-items:center;">
-                    <div><strong>${c.nombre}</strong><br><span style="font-size:0.7em;color:#aaa">${labelType}</span></div>
-                    <button class="btn-trash" onclick="borrarConcepto('${doc.id}')">🗑️</button>
-                </div>`;
+                if(listDiv) {
+                    listDiv.innerHTML += `<div class="item-temp-eval" style="display:flex;justify-content:space-between;align-items:center;">
+                        <div><strong>${c.nombre}</strong><br><span style="font-size:0.7em;color:#aaa">${labelType}</span></div>
+                        <button class="btn-trash" onclick="borrarConcepto('${doc.id}')">🗑️</button>
+                    </div>`;
+                }
             }
         });
     });
@@ -202,10 +190,8 @@ function cargarPorteros() {
             c.innerHTML += `<div class="portero-card"><div style="display:flex; align-items:center;"><img src="${p.foto||def}" class="mini-foto-list"><div><div class="card-title">${p.nombre}</div><div class="card-subtitle">${p.equipo} (${p.anio||'-'})</div></div></div><div><button class="btn-icon-action" onclick="window.cargarDatosEdicion('${p.id}')">✏️</button><button class="btn-trash" onclick="window.borrarPortero('${p.id}')">🗑️</button></div></div>`;
         });
         const opts = '<option value="">Seleccionar...</option>' + lista.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
-        ['obj-portero', 'conf-portero-titular'].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) el.innerHTML = opts;
-        });
+        const confSelect = document.getElementById('conf-portero-titular');
+        if(confSelect) confSelect.innerHTML = opts;
     });
 }
 window.procesarPortero = function() {
@@ -265,107 +251,6 @@ window.cancelarEdicion = function() {
 }
 window.borrarPortero = function(id) { if(confirm("¿Borrar?")) db.collection("porteros").doc(id).delete(); }
 
-// --- OBJETIVOS ---
-window.resetearEvaluacionTemporal = function() {
-    evaluacionesTemporales = []; competenciaSeleccionada = null; window.selectCompetencia(null);
-    window.renderizarListaTemporal(); 
-    document.getElementById('contenedor-evaluacion-temporal').style.display = 'none'; 
-    document.getElementById('obj-observacion').value = ''; 
-    window.cargarAccionesObjetivos();
-}
-window.cargarAccionesObjetivos = function() {
-    const tipo = document.getElementById('obj-tipo').value; const sel = document.getElementById('obj-accion');
-    sel.innerHTML = '<option value="">Seleccionar Acción...</option>'; sel.disabled = true;
-    if (tipo && ACCIONES_EVALUACION[tipo]) {
-        sel.disabled = false;
-        ACCIONES_EVALUACION[tipo].forEach(acc => { if (!evaluacionesTemporales.some(e => e.accion === acc)) { sel.innerHTML += `<option value="${acc}">${acc}</option>`; } });
-    }
-}
-window.selectCompetencia = function(val) {
-    competenciaSeleccionada = val; document.querySelectorAll('.btn-comp').forEach(b => b.classList.remove('active'));
-    if(val) document.querySelector(`.btn-comp.comp-${val}`).classList.add('active'); document.getElementById('obj-competencia-val').value = val;
-}
-window.agregarEvaluacionTemporal = function() {
-    const pid = document.getElementById('obj-portero').value; const tipo = document.getElementById('obj-tipo').value;
-    const accion = document.getElementById('obj-accion').value; const comp = competenciaSeleccionada; const score = document.getElementById('obj-puntaje').value;
-    if(!pid || !accion || !comp) return alert("Completa los datos");
-    evaluacionesTemporales.push({ accion: accion, tipo: tipo, competencia: parseInt(comp), puntaje: parseInt(score) });
-    window.renderizarListaTemporal(); document.getElementById('obj-accion').value = ""; window.selectCompetencia(null);
-    document.getElementById('obj-puntaje').value = "1"; window.cargarAccionesObjetivos(); document.getElementById('contenedor-evaluacion-temporal').style.display = 'block';
-}
-window.renderizarListaTemporal = function() {
-    const cont = document.getElementById('lista-temp-evaluaciones'); cont.innerHTML = '';
-    evaluacionesTemporales.forEach(item => {
-        let col='#ccc', txt='';
-        if(item.competencia===1){col='var(--comp-1)';txt='Inc. Inconsciente';} if(item.competencia===2){col='var(--comp-2)';txt='Inc. Consciente';}
-        if(item.competencia===3){col='var(--comp-3)';txt='Comp. Consciente';} if(item.competencia===4){col='var(--comp-4)';txt='Comp. Inconsciente';}
-        cont.innerHTML += `<div class="item-temp-eval" style="border-left: 4px solid ${col}"><strong>${item.accion}</strong><br><span style="color:${col}">${txt}</span> | Nota: ${item.puntaje}</div>`;
-    });
-}
-window.guardarReporteCompleto = function() {
-    const pid = document.getElementById('obj-portero').value; const fecha = document.getElementById('obj-fecha').value;
-    const observacion = document.getElementById('obj-observacion').value;
-
-    if(!pid || !fecha || evaluacionesTemporales.length === 0) return alert("Sin datos");
-    const reporteID = String(Date.now());
-    const reporte = { id: reporteID, porteroId: pid, fecha: fecha, acciones: evaluacionesTemporales, observacion: observacion, timestamp: Date.now() };
-    
-    db.collection("reportes").doc(reporteID).set(reporte).then(() => {
-        const batch = db.batch();
-        evaluacionesTemporales.forEach(item => {
-            const ref = db.collection("seguimientos").doc();
-            batch.set(ref, { porteroId: pid, fecha: fecha, accion: item.accion, competencia: item.competencia, puntaje: item.puntaje, reporteId: reporteID });
-        });
-        batch.commit(); generarPDFReporteLote(reporte); window.resetearEvaluacionTemporal();
-    });
-}
-
-function generarPDFReporteLote(reporte) {
-    db.collection("porteros").doc(reporte.porteroId).get().then(doc => {
-        const p = doc.data(); const foto = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4=";
-        let filas = ''; let sum = 0;
-        reporte.acciones.forEach(item => {
-            sum += parseInt(item.puntaje);
-            let bg='#ccc', fg='white', label='';
-            if(item.competencia===1){bg='#E74C3C';label='INCOMP. INCONSCIENTE';} if(item.competencia===2){bg='#E67E22';label='INCOMP. CONSCIENTE';}
-            if(item.competencia===3){bg='#F1C40F';label='COMP. CONSCIENTE';fg='black';} if(item.competencia===4){bg='#27AE60';label='COMP. INCONSCIENTE';}
-            filas += `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${item.accion}</td><td style="padding:8px; border-bottom:1px solid #eee; text-align:center;"><span style="background:${bg}; color:${fg}; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold;">${label}</span></td><td style="padding:8px; border-bottom:1px solid #eee; text-align:center; font-weight:bold;">${item.puntaje}</td></tr>`;
-        });
-        const media = (sum / reporte.acciones.length).toFixed(1);
-        
-        const obsHtml = reporte.observacion ? 
-            `<div class="pdf-obs-box" style="margin-top:20px; border: 1px solid #ddd; background: #f9f9f9; padding:10px;">
-                <div class="pdf-obs-header" style="color:#CB3524; font-weight:bold; border-bottom:1px solid #ccc; padding-bottom:5px; margin-bottom:5px;">OBSERVACIÓN FINAL DEL SEGUIMIENTO DE OBJETIVOS</div>
-                <div style="font-size:12px; white-space: pre-wrap;">${reporte.observacion}</div>
-             </div>` : '';
-
-        const html = `<div class="pdf-container"><div class="pdf-header-pro"><img src="ESCUDO ATM.png" class="pdf-logo"><div class="pdf-title-box"><h1>ATLÉTICO DE MADRID</h1><h2>SEGUIMIENTO DE OBJETIVOS</h2></div></div><div class="pdf-divider-red"></div><div class="pdf-portero-ficha" style="margin-bottom:20px;"><img src="${foto}" class="pdf-portero-foto"><div class="pdf-portero-datos" style="margin-left:20px;"><h2 style="margin:0;color:#CB3524;">${p.nombre}</h2><p style="margin:5px 0;">${p.equipo} - ${p.categoria}</p><p>Fecha Reporte: <strong>${reporte.fecha}</strong></p><p style="margin-top:5px;font-size:1.1em;color:#1C2C5B"><strong>Nota Media Seguimiento: ${media}</strong></p></div></div><div class="pdf-section-pro"><h3 class="pdf-section-title">EVALUACIÓN DE COMPETENCIAS</h3><table style="width:100%; border-collapse:collapse; font-size:12px;"><thead><tr style="background:#f0f0f0;"><th style="padding:10px;">Acción Técnica</th><th style="padding:10px;text-align:center;">Nivel</th><th style="padding:10px;text-align:center;">Nota</th></tr></thead><tbody>${filas}</tbody></table></div>${obsHtml}<div class="pdf-footer"><p>Guardian Lab ATM Pro - Reporte de Seguimiento</p></div></div>`;
-        
-        document.getElementById('preview-content').innerHTML = html; document.getElementById('printable-area').innerHTML = html; document.getElementById('modal-pdf-preview').style.display = 'flex';
-    });
-}
-function cargarHistorialReportes() {
-    db.collection("reportes").orderBy("timestamp", "desc").limit(20).onSnapshot(snap => {
-        const cont = document.getElementById('lista-seguimientos'); cont.innerHTML = '';
-        snap.forEach(doc => {
-            const rep = doc.data();
-            db.collection("porteros").doc(rep.porteroId).get().then(pDoc => {
-                if(pDoc.exists) { const p = pDoc.data(); cont.innerHTML += `<div class="eval-card" style="border-left: 5px solid var(--atm-blue)"><div><div style="font-weight:bold;font-size:0.9rem;">${p.nombre}</div><div style="font-size:0.8rem;color:var(--text-sec);">Reporte (${rep.acciones.length} acc.)</div><div style="font-size:0.75rem;margin-top:4px;">${rep.fecha}</div></div><div style="display:flex; gap:5px;"><button class="btn-icon-action" onclick="window.verPDFReporteObj('${doc.id}')">📄</button><button class="btn-trash" onclick="window.borrarReporte('${doc.id}')">🗑️</button></div></div>`; }
-            });
-        });
-    });
-}
-window.verPDFReporteObj = function(id) { db.collection("reportes").doc(String(id)).get().then(doc => { if(doc.exists) generarPDFReporteLote(doc.data()); }); }
-window.borrarReporte = function(id) { 
-    if(confirm("¿Borrar?")) {
-        db.collection("reportes").doc(String(id)).delete();
-        db.collection("seguimientos").where("reporteId", "==", String(id)).get().then(snap => {
-            const batch = db.batch();
-            snap.forEach(doc => batch.delete(doc.ref));
-            batch.commit();
-        });
-    }
-}
 
 // --- LIVE MATCH ---
 window.abrirConfigPartido = function() {
@@ -401,7 +286,7 @@ window.actualizarUI = function() {
     if(!partidoLive.porteroActualId) return;
     document.getElementById('live-portero-nombre').innerText = "Cargando...";
     db.collection("porteros").doc(String(partidoLive.porteroActualId)).get().then(doc => {
-        if(doc.exists) { const p = doc.data(); document.getElementById('live-portero-nombre').innerText = p.nombre; document.getElementById('live-portero-foto').src = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4="; }
+        if(doc.exists) { const p = doc.data(); document.getElementById('live-portero-nombre').innerText = p.nombre; document.getElementById('live-portero-foto').src = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIwIDIxdi0yYTQgNCAwIDAgMC00LTRoLThhNCA0IDAgMCAwLTQgNHYyIi8+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0Ii8+PC9zdmc+"; }
     });
 }
 window.controlCrono = function(act) {
@@ -431,6 +316,40 @@ window.controlCrono = function(act) {
     if(act==='start') document.getElementById('btn-fin-1').style.display='block'; if(act==='fin1') document.getElementById('btn-ini-2').style.display='block'; if(act==='ini2') document.getElementById('btn-fin-partido').style.display='block';
 }
 window.updCrono = function() { const m = Math.floor(partidoLive.crono.seg/60); const s = partidoLive.crono.seg%60; document.getElementById('crono').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
+
+// NUEVA FUNCIÓN: DESHACER ÚLTIMA ACCIÓN
+window.deshacerUltimaAccion = function() {
+    if (partidoLive.acciones.length === 0) return alert("No hay acciones registradas para deshacer.");
+    
+    if (confirm("¿Seguro que quieres deshacer el último registro?")) {
+        const ultima = partidoLive.acciones.pop(); // Saca la última acción
+
+        // Revertir el marcador si la última acción era un gol
+        if (ultima.tipo === 'GOL_FAVOR') {
+            partidoLive.marcador.local = Math.max(0, partidoLive.marcador.local - 1);
+            document.getElementById('score-local').innerText = partidoLive.marcador.local;
+        } else if (ultima.tipo === 'GOL_CONTRA') {
+            partidoLive.marcador.rival = Math.max(0, partidoLive.marcador.rival - 1);
+            document.getElementById('score-rival').innerText = partidoLive.marcador.rival;
+        }
+
+        // Re-renderizar la cronología visual
+        const log = document.getElementById('live-log');
+        log.innerHTML = '';
+        partidoLive.acciones.forEach(ev => {
+            let cl='',ic=''; 
+            if(ev.tipo==='ACCION'){cl=ev.res==='CORRECTO'?'log-ok':'log-error';ic=ev.res==='CORRECTO'?'✅':'❌';}
+            if(ev.tipo==='GOL_FAVOR'){cl='log-gol-atm';ic='⚽';} 
+            if(ev.tipo==='GOL_CONTRA'){cl='log-gol-rival';ic='🥅';} 
+            if(ev.tipo==='GOL_ANULADO'){cl='log-anulado';ic='🚫';}
+            if(ev.tipo==='HITO'){ log.innerHTML=`<div class="log-item" style="background:#444;color:white;justify-content:center;"><strong>${ev.nom}</strong></div>` + log.innerHTML; return; }
+            log.innerHTML=`<div class="log-item ${cl}"><div><strong>${ev.min}</strong> ${ev.nom} (${ev.pnom})</div><div>${ic}</div></div>`+log.innerHTML;
+        });
+
+        guardarEstadoLive();
+    }
+}
+
 window.regEv = function(tipo, nom, res=null, obs=null) {
     const min = Math.floor(partidoLive.crono.seg/60)+1;
     const ev = {id:Date.now(), min:min+"'", parte:partidoLive.parteActual, seg:partidoLive.crono.seg, tipo, nom, pid:partidoLive.porteroActualId, pnom:'...', res, obs};
