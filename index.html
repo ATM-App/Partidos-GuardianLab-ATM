@@ -18,7 +18,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
     <link rel="stylesheet" href="style.css">
 </head>
@@ -133,8 +132,18 @@
     <div id="modal-cambio" class="modal"><div class="modal-content modern-card"><span class="close-btn" onclick="window.cerrarModal('modal-cambio')">&times;</span><h3>Realizar Cambio</h3><select id="select-cambio-portero" class="full-width"><option>Cargando...</option></select><button onclick="window.confirmarCambio()" class="btn-main" style="background:var(--atm-blue)">Confirmar Cambio</button></div></div>
     <div id="modal-gol-rival" class="modal"><div class="modal-content modern-card" style="border-color: #ffaa00;"><h3>Gol en Contra</h3><div class="row"><button onclick="window.registrarGolContra(false)" class="btn-main" style="background:#444">NO ERROR</button><button onclick="window.mostrarInputError()" class="btn-main" style="background:var(--atm-red)">SÍ, ERROR</button></div><div id="div-error-detalle" style="display:none; margin-top:15px;"><input type="text" id="gol-error-detalle" placeholder="Detalle..."><button onclick="window.registrarGolContra(true)" class="btn-main">Confirmar</button></div></div></div>
     
-    <div id="modal-accion" class="modal"><div class="modal-content modern-card" style="text-align:center; position:relative;"><span class="close-btn" onclick="window.cerrarModal('modal-accion'); document.getElementById('accion-obs').value='';" style="position:absolute; top:10px; right:15px; font-size:28px;">&times;</span><h3 id="accion-titulo" style="color:var(--atm-red); margin-bottom:20px; margin-top:15px;">Acción</h3><div class="row"><button onclick="window.guardarAccionLive('CORRECTO')" class="btn-main" style="background:#00ff88; color:black">✅ Correcto</button><button onclick="window.guardarAccionLive('ERROR')" class="btn-main" style="background:var(--atm-red)">❌ Error</button></div><input type="text" id="accion-obs" placeholder="Observación (opcional)" style="margin-top:15px"></div></div>
-    
+    <div id="modal-accion" class="modal">
+        <div class="modal-content modern-card" style="text-align:center; position:relative;">
+            <span class="close-btn" onclick="window.cerrarModal('modal-accion'); document.getElementById('accion-obs').value='';" style="position:absolute; top:10px; right:15px; font-size:28px;">&times;</span>
+            <h3 id="accion-titulo" style="color:var(--atm-red); margin-bottom:20px; margin-top:15px;">Acción</h3>
+            <div class="row">
+                <button onclick="window.guardarAccionLive('CORRECTO')" class="btn-main" style="background:#00ff88; color:black">✅ Correcto</button>
+                <button onclick="window.guardarAccionLive('ERROR')" class="btn-main" style="background:var(--atm-red)">❌ Error</button>
+            </div>
+            <input type="text" id="accion-obs" placeholder="Observación (opcional)" style="margin-top:15px">
+        </div>
+    </div>
+
     <div id="modal-fin-partido" class="modal"><div class="modal-content modern-card" style="max-width:600px"><h3>Resumen del Partido</h3><div class="row" style="margin-bottom:15px; background:rgba(0,0,0,0.2); padding:10px; border-radius:10px; justify-content: space-around; align-items: center;"><span style="font-weight:bold">ATM</span><span id="fin-res-local" style="font-size:1.5rem; font-weight:800; color:var(--atm-red)">0</span><span style="font-weight:bold">-</span><span id="fin-res-rival" style="font-size:1.5rem; font-weight:800; color:var(--atm-red)">0</span><span style="font-weight:bold">RIVAL</span></div><div id="container-analisis-porteros" style="max-height: 400px; overflow-y:auto; margin-bottom:15px;"></div><button onclick="window.prepararVistaPreviaPDF()" class="btn-main" style="background: linear-gradient(135deg, #00ff88, #00cc6a); color:black; margin-top:10px;">📄 Generar Vista Previa</button></div></div>
     <div id="modal-editar-analisis" class="modal"><div class="modal-content modern-card" style="max-width:600px"><span class="close-btn" onclick="window.cerrarModal('modal-editar-analisis')">&times;</span><h3>Editar Análisis Técnico</h3><div id="container-editar-analisis" style="max-height: 400px; overflow-y:auto; margin-bottom:15px;"></div><button onclick="window.guardarEdicionAnalisis()" class="btn-main" style="background: var(--atm-blue)">💾 Guardar Cambios</button></div></div>
     <div id="modal-pdf-preview" class="modal" style="background: rgba(10,10,10,0.98); z-index: 2000;"><div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center;"><div style="width:100%; display:flex; justify-content:center; align-items:center; padding:15px; background:#111; border-bottom:1px solid #333;"><h3 style="color:white; margin:0 20px 0 0;">Vista Previa</h3><button onclick="window.imprimirPDFNativo()" class="btn-main" style="width:auto; padding:10px 25px; background:white; color:black; font-weight:bold; margin-right:10px;">🖨️ IMPRIMIR / GUARDAR</button><button onclick="window.cerrarModal('modal-pdf-preview')" class="btn-small-red">Cerrar</button></div><div style="flex:1; overflow-y:auto; background:#555; width:100%; display:flex; justify-content:center; padding:40px;"><div id="preview-content"></div></div></div></div>
