@@ -19,25 +19,12 @@ try {
 const db = firebase.firestore();
 const auth = firebase.auth(); 
 
-// HELPERS DB
-function dbSave(storeName, data) {
-    const id = String(data.id || Date.now());
-    return db.collection(storeName).doc(id).set(data).then(() => true).catch(err => { console.error(err); return false; });
-}
-function dbGetAll(storeName) {
-    return db.collection(storeName).get().then(snap => {
-        const list = []; snap.forEach(doc => list.push(doc.data())); return list;
-    }).catch(err => { console.error(err); return []; });
-}
-function dbDelete(storeName, id) {
-    return db.collection(storeName).doc(String(id)).delete().catch(err => console.error(err));
-}
-
 // --- VARIABLES GLOBALES ---
 let partidoLive = { config: {}, acciones: [], marcador: {local:0, rival:0}, porterosJugaron: new Set(), minutosJugados: {}, porteroActualId: null, parteActual: 'Pre-Partido', crono: {seg:0, int:null, run:false, startTs:0, savedSeg:0, lastUpdate:0} };
 let accionTemporal = null;
 let porteroEnEdicionId = null;
 let partidoEnEdicion = null;
+let porteroSeleccionadoParaCambio = null; // Para la cuadricula visual
 
 // CATÁLOGOS BASE
 let CATALOGO_ACCIONES = {
@@ -48,6 +35,7 @@ let CATALOGO_ACCIONES = {
 };
 
 let categoriaAccionActiva = "DEFENSIVAS";
+let iconosPersonalizados = {}; // Diccionario para guardar el icono de cada concepto
 
 // --- INICIO ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -90,7 +78,6 @@ window.cambiarSeccion = function(sec) {
     const destEl = document.getElementById('section-'+sec);
     if(destEl) destEl.style.display = 'block';
     
-    // Activar botón en el dock
     let realBtnId = sec === 'live' ? 'btn-partidos' : 'btn-'+sec;
     const btnDest = document.getElementById(realBtnId);
     if(btnDest) btnDest.classList.add('active');
@@ -105,17 +92,23 @@ window.cambiarSeccion = function(sec) {
     }
 }
 
-// --- CONCEPTOS PERSONALIZADOS ---
+// --- CONCEPTOS PERSONALIZADOS (AHORA CON ICONOS) ---
+window.seleccionarIcono = function(elemento, nombreIcono) {
+    document.querySelectorAll('.icon-opt').forEach(el => el.classList.remove('selected'));
+    elemento.classList.add('selected');
+    document.getElementById('new-concepto-icon-val').value = nombreIcono;
+}
+
 function cargarConceptosPersonalizados() {
     db.collection('conceptos').onSnapshot(snap => {
         const listDiv = document.getElementById('lista-conceptos-custom');
         if(listDiv) listDiv.innerHTML = '';
 
-        // Reset
         CATALOGO_ACCIONES["DEFENSIVAS"].grupos["PERSONALIZADAS"] = [];
         CATALOGO_ACCIONES["OFENSIVAS"].grupos["PERSONALIZADAS"] = [];
         CATALOGO_ACCIONES["TÁCTICAS"].grupos["PERSONALIZADAS"] = [];
         CATALOGO_ACCIONES["REINCORPORACIONES"].grupos["PERSONALIZADAS"] = [];
+        iconosPersonalizados = {};
 
         snap.forEach(doc => {
             const c = doc.data();
@@ -127,11 +120,17 @@ function cargarConceptosPersonalizados() {
                 if (CATALOGO_ACCIONES[cat]) {
                     CATALOGO_ACCIONES[cat].grupos["PERSONALIZADAS"].push(c.nombre);
                 }
+                
+                // Guardar icono en diccionario local
+                iconosPersonalizados[c.nombre] = c.icono || 'star';
                 labelType = `Live Pro (${cat})`;
 
                 if(listDiv) {
                     listDiv.innerHTML += `<div class="item-temp-eval" style="display:flex;justify-content:space-between;align-items:center;">
-                        <div><strong>${c.nombre}</strong><br><span style="font-size:0.7em;color:#aaa">${labelType}</span></div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span class="material-symbols-outlined" style="color:var(--atm-red)">${iconosPersonalizados[c.nombre]}</span>
+                            <div><strong>${c.nombre}</strong><br><span style="font-size:0.7em;color:#aaa">${labelType}</span></div>
+                        </div>
                         <button class="btn-trash" onclick="borrarConcepto('${doc.id}')"><span class="material-symbols-outlined">delete</span></button>
                     </div>`;
                 }
@@ -147,10 +146,13 @@ function cargarConceptosPersonalizados() {
 window.guardarNuevoConcepto = function() {
     const nombre = document.getElementById('new-concepto-nombre').value;
     const tipo = document.getElementById('new-concepto-tipo').value;
+    const icono = document.getElementById('new-concepto-icon-val').value;
+    
     if(!nombre) return alert("Escribe un nombre");
     
-    db.collection('conceptos').add({ nombre, tipo, id: Date.now() });
+    db.collection('conceptos').add({ nombre, tipo, icono, id: Date.now() });
     document.getElementById('new-concepto-nombre').value = '';
+    window.seleccionarIcono(document.querySelectorAll('.icon-opt')[0], 'star'); // Reset
     alert("Acción guardada correctamente");
 }
 
@@ -344,6 +346,16 @@ window.deshacerUltimaAccion = function() {
     }
 }
 
+// FUNCION PARA ANIMAR EL MARCADOR (FEEDBACK VISUAL GOLES)
+function animarMarcador(equipo) {
+    const el = document.getElementById(`score-${equipo}`);
+    const animClass = equipo === 'local' ? 'goal-anim-local' : 'goal-anim-rival';
+    el.classList.remove(animClass);
+    void el.offsetWidth; // forzar reflow para reiniciar animacion
+    el.classList.add(animClass);
+    setTimeout(() => el.classList.remove(animClass), 600);
+}
+
 window.regEv = function(tipo, nom, res=null, obs=null) {
     const min = Math.floor(partidoLive.crono.seg/60)+1;
     const ev = {id:Date.now(), min:min+"'", parte:partidoLive.parteActual, seg:partidoLive.crono.seg, tipo, nom, pid:partidoLive.porteroActualId, pnom:'...', res, obs};
@@ -356,6 +368,7 @@ window.regEv = function(tipo, nom, res=null, obs=null) {
     else { log.innerHTML=`<div class="log-item ${cl}"><div><strong>${ev.min}</strong> ${nom} (${ev.pnom})</div><div>${ic}</div></div>`+log.innerHTML; }
     guardarEstadoLive();
 }
+
 window.renderizarPanelAcciones = function() {
     const panel = document.getElementById('panel-acciones-avanzado'); panel.innerHTML = '';
     const tabs = document.createElement('div'); tabs.className='tabs-container';
@@ -370,10 +383,18 @@ window.renderizarPanelAcciones = function() {
         if (acciones && acciones.length > 0) {
             const tit = document.createElement('div'); tit.className='action-group-title'; tit.innerText=gName; panel.appendChild(tit);
             const grid = document.createElement('div'); grid.className='actions-grid-new';
+            
             acciones.forEach(act => { 
                 const b = document.createElement('button'); 
-                b.innerText=act; 
                 b.className=`action-btn-new btn-${catId}`; 
+                
+                // Si la acción tiene un icono guardado, se lo añadimos al botón
+                let iconHTML = '';
+                if (iconosPersonalizados[act]) {
+                    iconHTML = `<span class="material-symbols-outlined">${iconosPersonalizados[act]}</span>`;
+                }
+                
+                b.innerHTML = `${iconHTML}<span>${act}</span>`;
                 b.onclick = () => window.prepararAccion(act); 
                 grid.appendChild(b); 
             });
@@ -381,39 +402,88 @@ window.renderizarPanelAcciones = function() {
         }
     });
 }
+
 window.prepararAccion = function(n) { if(!partidoLive.crono.run) return alert("Crono parado"); accionTemporal = n; document.getElementById('accion-titulo').innerText = n; document.getElementById('modal-accion').style.display='flex'; }
 window.guardarAccionLive = function(r) { window.regEv('ACCION', accionTemporal, r, document.getElementById('accion-obs').value); document.getElementById('modal-accion').style.display='none'; document.getElementById('accion-obs').value=''; }
+
 window.gestionarGol = function(equipo, accion) {
     if(!partidoLive.crono.run) return alert("Crono parado");
-    if(equipo === 'local') { if(accion === 'sumar') { partidoLive.marcador.local++; window.regEv('GOL_FAVOR', 'Gol ATM'); } else { if(partidoLive.marcador.local>0) { partidoLive.marcador.local--; window.regEv('GOL_ANULADO', 'Gol ATM Anulado'); } } document.getElementById('score-local').innerText = partidoLive.marcador.local; } 
-    else { if(accion === 'sumar') { document.getElementById('modal-gol-rival').style.display='flex'; } else { if(partidoLive.marcador.rival>0) { partidoLive.marcador.rival--; window.regEv('GOL_ANULADO', 'Gol Rival Anulado'); document.getElementById('score-rival').innerText = partidoLive.marcador.rival; } } }
+    if(equipo === 'local') { 
+        if(accion === 'sumar') { 
+            partidoLive.marcador.local++; 
+            animarMarcador('local');
+            window.regEv('GOL_FAVOR', 'Gol ATM'); 
+        } else { 
+            if(partidoLive.marcador.local>0) { partidoLive.marcador.local--; window.regEv('GOL_ANULADO', 'Gol ATM Anulado'); } 
+        } 
+        document.getElementById('score-local').innerText = partidoLive.marcador.local; 
+    } else { 
+        if(accion === 'sumar') { 
+            document.getElementById('modal-gol-rival').style.display='flex'; 
+        } else { 
+            if(partidoLive.marcador.rival>0) { partidoLive.marcador.rival--; window.regEv('GOL_ANULADO', 'Gol Rival Anulado'); document.getElementById('score-rival').innerText = partidoLive.marcador.rival; } 
+        } 
+    }
     guardarEstadoLive();
 }
+
 window.registrarGolContra = function(isError) {
-    partidoLive.marcador.rival++; document.getElementById('score-rival').innerText = partidoLive.marcador.rival;
+    partidoLive.marcador.rival++; 
+    document.getElementById('score-rival').innerText = partidoLive.marcador.rival;
+    animarMarcador('rival');
+    
     let obs = isError ? "ERROR: " + document.getElementById('gol-error-detalle').value : "";
     window.regEv('GOL_CONTRA', 'Gol Rival', isError?'ERROR':null, obs);
     document.getElementById('div-error-detalle').style.display='none'; document.getElementById('gol-error-detalle').value=''; document.getElementById('modal-gol-rival').style.display='none';
     guardarEstadoLive();
 }
 window.mostrarInputError = function() { document.getElementById('div-error-detalle').style.display='block'; }
+
+// CAMBIO DE PORTERO VISUAL (CUADRÍCULA DE FOTOS)
 window.abrirModalCambio = function() {
     if(!partidoLive.crono.run && partidoLive.parteActual!=='Descanso') return alert("Solo en juego o descanso");
+    
     db.collection("porteros").get().then(snap => {
-        const sel = document.getElementById('select-cambio-portero'); sel.innerHTML='';
+        const grid = document.getElementById('grid-cambio-porteros'); 
+        grid.innerHTML='';
+        porteroSeleccionadoParaCambio = null;
+        document.getElementById('btn-conf-cambio').disabled = true;
+
         let count = 0;
-        snap.forEach(doc => { const p = doc.data(); if(p.equipo === partidoLive.config.equipo && doc.id !== partidoLive.porteroActualId) { sel.innerHTML += `<option value="${doc.id}">${p.nombre}</option>`; count++; } });
-        if(count === 0) return alert("No hay suplentes");
+        snap.forEach(doc => { 
+            const p = doc.data(); 
+            if(p.equipo === partidoLive.config.equipo && doc.id !== partidoLive.porteroActualId) { 
+                const foto = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4=";
+                grid.innerHTML += `
+                <div class="sub-card" id="sub-${doc.id}" onclick="window.seleccionarSuplente('${doc.id}')">
+                    <img src="${foto}">
+                    <div style="font-weight:bold; font-size:0.8rem; color:white;">${p.nombre}</div>
+                </div>`; 
+                count++; 
+            } 
+        });
+        if(count === 0) return alert("No hay porteros suplentes configurados en este equipo.");
         document.getElementById('modal-cambio').style.display='flex';
     });
 }
+
+window.seleccionarSuplente = function(id) {
+    porteroSeleccionadoParaCambio = id;
+    document.querySelectorAll('.sub-card').forEach(el => el.classList.remove('selected'));
+    document.getElementById(`sub-${id}`).classList.add('selected');
+    document.getElementById('btn-conf-cambio').disabled = false;
+}
+
 window.confirmarCambio = function() {
-    const pid = document.getElementById('select-cambio-portero').value;
+    if(!porteroSeleccionadoParaCambio) return;
+    const pid = porteroSeleccionadoParaCambio;
+    
     if(partidoLive.crono.run && partidoLive.porteroActualId) {
         const now = Date.now(); const delta = (now - partidoLive.crono.lastUpdate)/1000;
         if(!partidoLive.minutosJugados[partidoLive.porteroActualId]) partidoLive.minutosJugados[partidoLive.porteroActualId] = 0;
         partidoLive.minutosJugados[partidoLive.porteroActualId] += delta; partidoLive.crono.lastUpdate = now;
     }
+    
     db.collection("porteros").doc(pid).get().then(doc => {
         const entra = doc.data(); partidoLive.porteroActualId = pid;
         if(!partidoLive.porterosJugaron.includes(pid)) partidoLive.porterosJugaron.push(pid);
@@ -421,6 +491,7 @@ window.confirmarCambio = function() {
         window.regEv('CAMBIO', `Entra ${entra.nombre}`); window.actualizarUI(); document.getElementById('modal-cambio').style.display='none'; guardarEstadoLive();
     });
 }
+
 window.abrirModalFin = function() {
     document.getElementById('fin-res-local').innerText = partidoLive.marcador.local; document.getElementById('fin-res-rival').innerText = partidoLive.marcador.rival;
     const cont = document.getElementById('container-analisis-porteros'); cont.innerHTML = '';
