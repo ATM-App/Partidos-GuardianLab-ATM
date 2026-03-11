@@ -11,22 +11,22 @@ const firebaseConfig = {
   appId: "1:538502071393:web:21e9ba4fb8e11c87eb9620"
 };
 
-try {
-    firebase.initializeApp(firebaseConfig);
-    console.log("Firebase OK");
-} catch(e) { console.error("Error Firebase", e); }
+try { firebase.initializeApp(firebaseConfig); console.log("Firebase OK"); } catch(e) { console.error(e); }
 
 const db = firebase.firestore();
 const auth = firebase.auth(); 
 
 // --- VARIABLES GLOBALES ---
-let partidoLive = { config: {}, acciones: [], marcador: {local:0, rival:0}, porterosJugaron: new Set(), minutosJugados: {}, porteroActualId: null, parteActual: 'Pre-Partido', crono: {seg:0, int:null, run:false, startTs:0, savedSeg:0, lastUpdate:0} };
+let partidoLive = { config: { foco: '', clima: '' }, acciones: [], marcador: {local:0, rival:0}, porterosJugaron: new Set(), minutosJugados: {}, porteroActualId: null, parteActual: 'Pre-Partido', crono: {seg:0, int:null, run:false, startTs:0, savedSeg:0, lastUpdate:0} };
 let accionTemporal = null;
 let porteroEnEdicionId = null;
 let partidoEnEdicion = null;
-let porteroSeleccionadoParaCambio = null; // Para la cuadricula visual
+let porteroSeleccionadoParaCambio = null;
 
-// CATÁLOGOS BASE
+// NUEVAS VARIABLES DASHBOARD
+let zonaSeleccionada = null;
+let modificadoresActivos = [];
+
 let CATALOGO_ACCIONES = {
     "DEFENSIVAS": { id: "def", grupos: { "BLOCAJES": ["Blocaje Frontal Raso", "Blocaje Lateral Raso", "Blocaje Frontal Media Altura", "Blocaje Lateral Media Altura", "Blocaje Aéreo"], "DESVÍOS": ["Desvío Mano Natural", "Desvío Mano Cambiada", "Desvío 2 Manos"], "JUEGO AÉREO": ["Despeje 1 Puño", "Despeje 2 Puños", "Prolongación"], "1 VS 1": ["Reducción de Espacios", "Posición Cruz", "Apertura", "Caída Lateral"], "OTRAS": ["Rechace"], "PERSONALIZADAS": [] } },
     "OFENSIVAS": { id: "of", grupos: { "PASES CON LA MANO": ["Pase Mano Raso", "Pase Mano Alto", "Pase Mano Picado"], "PASES CON PIE": ["Volea", "Pase Corto", "Pase Largo", "Despeje", "Despeje Orientado"], "CONTINUIDAD": ["Perfil + Control + Pase Corto", "Perfil + Control + Pase Largo", "Largo Control Previo", "Largo en Movimiento"], "PERSONALIZADAS": [] } },
@@ -35,7 +35,7 @@ let CATALOGO_ACCIONES = {
 };
 
 let categoriaAccionActiva = "DEFENSIVAS";
-let iconosPersonalizados = {}; // Diccionario para guardar el icono de cada concepto
+let iconosPersonalizados = {}; 
 
 // --- INICIO ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cargarPartidosHistorial();
             cargarConceptosPersonalizados();
         } else {
-            auth.signInAnonymously().catch(err => alert("Error de conexión. Revisa tu internet."));
+            auth.signInAnonymously().catch(err => alert("Error de conexión."));
         }
     });
     recuperarPartidoEnCurso();
@@ -56,25 +56,20 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.onbeforeunload = function() {
-    if (partidoLive.crono.run || (partidoLive.parteActual !== 'Pre-Partido' && partidoLive.parteActual !== 'Final')) {
-        return "Partido en curso.";
-    }
+    if (partidoLive.crono.run || (partidoLive.parteActual !== 'Pre-Partido' && partidoLive.parteActual !== 'Final')) return "Partido en curso.";
 };
 
-// --- NAVEGACIÓN ---
 window.alternarTema = function() { document.body.classList.toggle('light-mode'); localStorage.setItem('guardian_theme', document.body.classList.contains('light-mode') ? 'light' : 'dark'); }
 
 window.cambiarSeccion = function(sec) {
     document.getElementById('modal-pdf-preview').style.display = 'none';
     document.getElementById('modal-fin-partido').style.display = 'none';
-    
     ['porteros','partidos','conceptos','live'].forEach(id => {
         const secEl = document.getElementById('section-'+id);
         const btnEl = document.getElementById('btn-'+id);
         if(secEl) secEl.style.display = 'none';
         if(btnEl) btnEl.classList.remove('active');
     });
-    
     const destEl = document.getElementById('section-'+sec);
     if(destEl) destEl.style.display = 'block';
     
@@ -84,15 +79,88 @@ window.cambiarSeccion = function(sec) {
     
     const banner = document.getElementById('live-match-banner');
     if(banner){
-        if(sec !== 'live' && partidoLive.parteActual !== 'Pre-Partido' && partidoLive.parteActual !== 'Final'){
-            banner.style.display = 'block';
-        } else {
-            banner.style.display = 'none';
-        }
+        if(sec !== 'live' && partidoLive.parteActual !== 'Pre-Partido' && partidoLive.parteActual !== 'Final'){ banner.style.display = 'block'; } else { banner.style.display = 'none'; }
     }
 }
 
-// --- CONCEPTOS PERSONALIZADOS (AHORA CON ICONOS) ---
+// --- CLIMA (OPEN-METEO GPS) ---
+window.obtenerClima = function() {
+    const wBtn = document.getElementById('weather-widget');
+    wBtn.innerHTML = '<span class="material-symbols-outlined">sync</span>...';
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(pos => {
+            const lat = pos.coords.latitude; const lon = pos.coords.longitude;
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
+                .then(r => r.json())
+                .then(data => {
+                    const t = data.current_weather.temperature;
+                    const wc = data.current_weather.weathercode;
+                    let icon = '☀️';
+                    if(wc >= 1 && wc <= 3) icon = '⛅';
+                    if(wc >= 45 && wc <= 67) icon = '🌧️';
+                    if(wc >= 71) icon = '❄️';
+                    wBtn.innerHTML = `${icon} ${t}°C`;
+                    partidoLive.config.clima = `${icon} ${t}°C`;
+                    guardarEstadoLive();
+                }).catch(() => wBtn.innerHTML = 'Error API');
+        }, () => wBtn.innerHTML = 'Sin permiso GPS');
+    } else { wBtn.innerHTML = 'No GPS'; }
+}
+
+// --- KPIs Y DASHBOARD ---
+function recalcularKPIs() {
+    if(!partidoLive.porteroActualId) return;
+    
+    let totalAcs = 0; let okAcs = 0; let golesEncajados = 0;
+    
+    partidoLive.acciones.forEach(a => {
+        if(a.pid === partidoLive.porteroActualId) {
+            if(a.tipo === 'ACCION') {
+                totalAcs++;
+                if(a.res === 'CORRECTO') okAcs++;
+            }
+            // Cuenta goles que no sean "Anulados" (GOL_CONTRA se asume válido)
+            if(a.tipo === 'GOL_CONTRA') golesEncajados++;
+        }
+    });
+
+    const acierto = totalAcs > 0 ? Math.round((okAcs / totalAcs) * 100) : 0;
+    
+    document.getElementById('kpi-acciones').innerText = totalAcs;
+    document.getElementById('kpi-acierto').innerText = `${acierto}%`;
+    document.getElementById('kpi-goles').innerText = golesEncajados;
+}
+
+window.guardarFoco = function() {
+    partidoLive.config.foco = document.getElementById('live-foco').value;
+    guardarEstadoLive();
+}
+
+window.selectZone = function(elemento, zona) {
+    document.querySelectorAll('.goal-zone').forEach(el => el.classList.remove('selected'));
+    if(zonaSeleccionada === zona) { zonaSeleccionada = null; return; } // Toggle off
+    elemento.classList.add('selected');
+    zonaSeleccionada = zona;
+}
+
+window.toggleMod = function(elemento, mod) {
+    if (modificadoresActivos.includes(mod)) {
+        modificadoresActivos = modificadoresActivos.filter(m => m !== mod);
+        elemento.classList.remove('active');
+    } else {
+        modificadoresActivos.push(mod);
+        elemento.classList.add('active');
+    }
+}
+
+function limpiarDashboardTactico() {
+    zonaSeleccionada = null;
+    modificadoresActivos = [];
+    document.querySelectorAll('.goal-zone').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.q-mod').forEach(el => el.classList.remove('active'));
+}
+
+// --- CONCEPTOS PERSONALIZADOS ---
 window.seleccionarIcono = function(elemento, nombreIcono) {
     document.querySelectorAll('.icon-opt').forEach(el => el.classList.remove('selected'));
     elemento.classList.add('selected');
@@ -101,191 +169,98 @@ window.seleccionarIcono = function(elemento, nombreIcono) {
 
 function cargarConceptosPersonalizados() {
     db.collection('conceptos').onSnapshot(snap => {
-        const listDiv = document.getElementById('lista-conceptos-custom');
-        if(listDiv) listDiv.innerHTML = '';
-
-        // Reset
-        CATALOGO_ACCIONES["DEFENSIVAS"].grupos["PERSONALIZADAS"] = [];
-        CATALOGO_ACCIONES["OFENSIVAS"].grupos["PERSONALIZADAS"] = [];
-        CATALOGO_ACCIONES["TÁCTICAS"].grupos["PERSONALIZADAS"] = [];
-        CATALOGO_ACCIONES["REINCORPORACIONES"].grupos["PERSONALIZADAS"] = [];
+        const listDiv = document.getElementById('lista-conceptos-custom'); if(listDiv) listDiv.innerHTML = '';
+        CATALOGO_ACCIONES["DEFENSIVAS"].grupos["PERSONALIZADAS"] = []; CATALOGO_ACCIONES["OFENSIVAS"].grupos["PERSONALIZADAS"] = []; CATALOGO_ACCIONES["TÁCTICAS"].grupos["PERSONALIZADAS"] = []; CATALOGO_ACCIONES["REINCORPORACIONES"].grupos["PERSONALIZADAS"] = [];
         iconosPersonalizados = {};
 
         snap.forEach(doc => {
-            const c = doc.data();
-            let labelType = "";
-            
+            const c = doc.data(); let labelType = "";
             if (c.tipo.startsWith("LIVE_")) {
                 const map = { "LIVE_DEF": "DEFENSIVAS", "LIVE_OF": "OFENSIVAS", "LIVE_TAC": "TÁCTICAS", "LIVE_REIN": "REINCORPORACIONES" };
                 const cat = map[c.tipo];
-                if (CATALOGO_ACCIONES[cat]) {
-                    CATALOGO_ACCIONES[cat].grupos["PERSONALIZADAS"].push(c.nombre);
-                }
-                
-                // Guardar icono en diccionario local
+                if (CATALOGO_ACCIONES[cat]) CATALOGO_ACCIONES[cat].grupos["PERSONALIZADAS"].push(c.nombre);
                 iconosPersonalizados[c.nombre] = c.icono || 'star';
                 labelType = `Live Pro (${cat})`;
-
-                if(listDiv) {
-                    listDiv.innerHTML += `<div class="item-temp-eval" style="display:flex;justify-content:space-between;align-items:center;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <span class="material-symbols-outlined" style="color:var(--atm-red)">${iconosPersonalizados[c.nombre]}</span>
-                            <div><strong>${c.nombre}</strong><br><span style="font-size:0.7em;color:#aaa">${labelType}</span></div>
-                        </div>
-                        <button class="btn-trash" onclick="borrarConcepto('${doc.id}')"><span class="material-symbols-outlined">delete</span></button>
-                    </div>`;
-                }
+                if(listDiv) { listDiv.innerHTML += `<div class="item-temp-eval" style="display:flex;justify-content:space-between;align-items:center;"><div style="display:flex; align-items:center; gap:10px;"><span class="material-symbols-outlined" style="color:var(--atm-red)">${iconosPersonalizados[c.nombre]}</span><div><strong>${c.nombre}</strong><br><span style="font-size:0.7em;color:#aaa">${labelType}</span></div></div><button class="btn-trash" onclick="borrarConcepto('${doc.id}')"><span class="material-symbols-outlined">delete</span></button></div>`; }
             }
         });
-        
-        if(document.getElementById('section-live').style.display === 'block') {
-            window.renderizarPanelAcciones();
-        }
+        if(document.getElementById('section-live').style.display === 'block') window.renderizarPanelAcciones();
     });
 }
-
 window.guardarNuevoConcepto = function() {
-    const nombre = document.getElementById('new-concepto-nombre').value;
-    const tipo = document.getElementById('new-concepto-tipo').value;
-    const icono = document.getElementById('new-concepto-icon-val').value;
-    
+    const nombre = document.getElementById('new-concepto-nombre').value; const tipo = document.getElementById('new-concepto-tipo').value; const icono = document.getElementById('new-concepto-icon-val').value;
     if(!nombre) return alert("Escribe un nombre");
-    
-    db.collection('conceptos').add({ nombre, tipo, icono, id: Date.now() });
-    document.getElementById('new-concepto-nombre').value = '';
-    window.seleccionarIcono(document.querySelectorAll('.icon-opt')[0], 'star'); // Reset
-    alert("Acción guardada correctamente");
+    db.collection('conceptos').add({ nombre, tipo, icono, id: Date.now() }); document.getElementById('new-concepto-nombre').value = ''; window.seleccionarIcono(document.querySelectorAll('.icon-opt')[0], 'star'); alert("Acción guardada correctamente");
 }
-
-window.borrarConcepto = function(id) {
-    if(confirm("¿Borrar esta acción?")) db.collection('conceptos').doc(id).delete();
-}
+window.borrarConcepto = function(id) { if(confirm("¿Borrar esta acción?")) db.collection('conceptos').doc(id).delete(); }
 
 // --- PORTEROS ---
-window.previsualizarFoto = function() {
-    const file = document.getElementById('fotoPorteroInput').files[0];
-    if(file){
-        const r = new FileReader();
-        r.onload = (e) => document.getElementById('fotoPreview').src = e.target.result;
-        r.readAsDataURL(file);
-    }
-}
-window.actualizarEquipos = function() {
-    const cat = document.getElementById('catPortero').value;
-    const sel = document.getElementById('equipoPortero');
-    sel.innerHTML = '<option value="">Selecciona Categoría...</option>';
-    if(!cat) return;
-    ['A','B','C','D','E','F'].forEach(l => sel.innerHTML += `<option value="${cat} ${l}">${cat} ${l}</option>`);
-}
+window.previsualizarFoto = function() { const file = document.getElementById('fotoPorteroInput').files[0]; if(file){ const r = new FileReader(); r.onload = (e) => document.getElementById('fotoPreview').src = e.target.result; r.readAsDataURL(file); } }
+window.actualizarEquipos = function() { const cat = document.getElementById('catPortero').value; const sel = document.getElementById('equipoPortero'); sel.innerHTML = '<option value="">Selecciona Categoría...</option>'; if(!cat) return; ['A','B','C','D','E','F'].forEach(l => sel.innerHTML += `<option value="${cat} ${l}">${cat} ${l}</option>`); }
 function cargarPorteros() {
     db.collection("porteros").onSnapshot((snapshot) => {
-        const lista = [];
-        snapshot.forEach(doc => lista.push({...doc.data(), id: doc.id}));
+        const lista = []; snapshot.forEach(doc => lista.push({...doc.data(), id: doc.id}));
         document.getElementById('total-porteros').innerText = lista.length;
-        const c = document.getElementById('lista-porteros');
-        c.innerHTML = '';
+        const c = document.getElementById('lista-porteros'); c.innerHTML = '';
         const def = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4=";
-        lista.forEach(p => {
-            c.innerHTML += `<div class="portero-card"><div style="display:flex; align-items:center;"><img src="${p.foto||def}" class="mini-foto-list"><div><div class="card-title">${p.nombre}</div><div class="card-subtitle">${p.equipo} (${p.anio||'-'})</div></div></div><div><button class="btn-icon-action" onclick="window.cargarDatosEdicion('${p.id}')"><span class="material-symbols-outlined" style="font-size: 18px;">edit</span></button><button class="btn-trash" onclick="window.borrarPortero('${p.id}')"><span class="material-symbols-outlined" style="font-size: 20px;">delete</span></button></div></div>`;
-        });
+        lista.forEach(p => { c.innerHTML += `<div class="portero-card"><div style="display:flex; align-items:center;"><img src="${p.foto||def}" class="mini-foto-list"><div><div class="card-title">${p.nombre}</div><div class="card-subtitle">${p.equipo} (${p.anio||'-'})</div></div></div><div><button class="btn-icon-action" onclick="window.cargarDatosEdicion('${p.id}')"><span class="material-symbols-outlined" style="font-size: 18px;">edit</span></button><button class="btn-trash" onclick="window.borrarPortero('${p.id}')"><span class="material-symbols-outlined" style="font-size: 20px;">delete</span></button></div></div>`; });
         const opts = '<option value="">Seleccionar...</option>' + lista.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
-        const confSelect = document.getElementById('conf-portero-titular');
-        if(confSelect) confSelect.innerHTML = opts;
+        const confSelect = document.getElementById('conf-portero-titular'); if(confSelect) confSelect.innerHTML = opts;
     });
 }
 window.procesarPortero = function() {
-    const n = document.getElementById('nombrePortero').value;
-    const a = document.getElementById('anioPortero').value;
-    const c = document.getElementById('catPortero').value;
-    const eq = document.getElementById('equipoPortero').value;
-    const file = document.getElementById('fotoPorteroInput').files[0];
-
+    const n = document.getElementById('nombrePortero').value; const a = document.getElementById('anioPortero').value; const c = document.getElementById('catPortero').value; const eq = document.getElementById('equipoPortero').value; const file = document.getElementById('fotoPorteroInput').files[0];
     if(!n || !c || !eq) return alert("Faltan datos");
-    
-    const btn = document.getElementById('btn-save');
-    btn.innerText = "Guardando..."; btn.disabled = true;
-
-    const guardar = (url) => {
-        const data = { nombre:n, anio:a, categoria:c, equipo:eq };
-        if(url) data.foto = url;
-        const prom = porteroEnEdicionId ? db.collection("porteros").doc(porteroEnEdicionId).update(data) : db.collection("porteros").add(data);
-        prom.then(() => { window.cancelarEdicion(); }).catch(e => alert("Error: " + e.message)).finally(() => { btn.innerText = "Añadir Jugador"; btn.disabled = false; });
-    };
-
-    if(file) {
-        const r = new FileReader();
-        r.onload = (e) => {
-            const img = new Image();
-            img.src = e.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
-                const max = 300; 
-                let w = img.width; let h = img.height;
-                if(w>h){ if(w>max){ h*=max/w; w=max; } } else { if(h>max){ w*=max/h; h=max; } }
-                canvas.width = w; canvas.height = h;
-                ctx.drawImage(img, 0, 0, w, h);
-                guardar(canvas.toDataURL('image/jpeg', 0.5));
-            };
-        };
-        r.readAsDataURL(file);
-    } else {
-        guardar(null);
-    }
+    const btn = document.getElementById('btn-save'); btn.innerText = "Guardando..."; btn.disabled = true;
+    const guardar = (url) => { const data = { nombre:n, anio:a, categoria:c, equipo:eq }; if(url) data.foto = url; const prom = porteroEnEdicionId ? db.collection("porteros").doc(porteroEnEdicionId).update(data) : db.collection("porteros").add(data); prom.then(() => { window.cancelarEdicion(); }).catch(e => alert("Error: " + e.message)).finally(() => { btn.innerText = "Añadir Jugador"; btn.disabled = false; }); };
+    if(file) { const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); const max = 300; let w = img.width; let h = img.height; if(w>h){ if(w>max){ h*=max/w; w=max; } } else { if(h>max){ w*=max/h; h=max; } } canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); guardar(canvas.toDataURL('image/jpeg', 0.5)); }; }; r.readAsDataURL(file); } else { guardar(null); }
 }
 window.cargarDatosEdicion = function(id) {
-    db.collection("porteros").doc(id).get().then(doc => {
-        const p = doc.data();
-        document.getElementById('nombrePortero').value = p.nombre; document.getElementById('anioPortero').value = p.anio;
-        document.getElementById('catPortero').value = p.categoria; window.actualizarEquipos();
-        document.getElementById('equipoPortero').value = p.equipo; document.getElementById('fotoPreview').src = p.foto || "";
-        porteroEnEdicionId = id; document.getElementById('btn-save').innerText = "Guardar Cambios";
-        document.getElementById('btn-cancel').style.display = "inline-block"; window.scrollTo({top:0, behavior:'smooth'});
-    });
+    db.collection("porteros").doc(id).get().then(doc => { const p = doc.data(); document.getElementById('nombrePortero').value = p.nombre; document.getElementById('anioPortero').value = p.anio; document.getElementById('catPortero').value = p.categoria; window.actualizarEquipos(); document.getElementById('equipoPortero').value = p.equipo; document.getElementById('fotoPreview').src = p.foto || ""; porteroEnEdicionId = id; document.getElementById('btn-save').innerText = "Guardar Cambios"; document.getElementById('btn-cancel').style.display = "inline-block"; window.scrollTo({top:0, behavior:'smooth'}); });
 }
 window.cancelarEdicion = function() {
-    porteroEnEdicionId = null; document.getElementById('nombrePortero').value = ''; document.getElementById('anioPortero').value = '';
-    document.getElementById('catPortero').value = ''; document.getElementById('equipoPortero').innerHTML = '';
-    document.getElementById('fotoPreview').src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4=";
-    document.getElementById('btn-save').innerText = "Añadir Jugador"; document.getElementById('btn-cancel').style.display = "none";
+    porteroEnEdicionId = null; document.getElementById('nombrePortero').value = ''; document.getElementById('anioPortero').value = ''; document.getElementById('catPortero').value = ''; document.getElementById('equipoPortero').innerHTML = ''; document.getElementById('fotoPreview').src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4="; document.getElementById('btn-save').innerText = "Añadir Jugador"; document.getElementById('btn-cancel').style.display = "none";
 }
 window.borrarPortero = function(id) { if(confirm("¿Borrar?")) db.collection("porteros").doc(id).delete(); }
-
 
 // --- LIVE MATCH ---
 window.abrirConfigPartido = function() {
     if(partidoLive.parteActual !== 'Pre-Partido' && partidoLive.parteActual !== 'Final') { if(!confirm("⚠️ Hay un partido en curso. ¿Iniciar uno nuevo?")) return; }
     const selEq = document.getElementById('conf-equipo');
     if (selEq.options.length <= 1) {
-        db.collection("porteros").get().then(snap => {
-            const eqs = new Set(); snap.forEach(doc => eqs.add(doc.data().equipo));
-            selEq.innerHTML = '<option value="">Equipo ATM...</option>';
-            [...eqs].sort().forEach(e => selEq.innerHTML += `<option value="${e}">${e}</option>`);
-        });
+        db.collection("porteros").get().then(snap => { const eqs = new Set(); snap.forEach(doc => eqs.add(doc.data().equipo)); selEq.innerHTML = '<option value="">Equipo ATM...</option>'; [...eqs].sort().forEach(e => selEq.innerHTML += `<option value="${e}">${e}</option>`); });
     }
     document.getElementById('modal-config-partido').style.display = 'flex';
 }
 window.filtrarPorterosPorEquipo = function() {
-    const eq = document.getElementById('conf-equipo').value; const sel = document.getElementById('conf-portero-titular');
-    sel.innerHTML = '<option value="">Cargando...</option>';
-    db.collection("porteros").where("equipo", "==", eq).get().then(snap => {
-        sel.innerHTML = '<option value="">Titular...</option>'; snap.forEach(doc => { sel.innerHTML += `<option value="${doc.id}">${doc.data().nombre}</option>`; });
-    });
+    const eq = document.getElementById('conf-equipo').value; const sel = document.getElementById('conf-portero-titular'); sel.innerHTML = '<option value="">Cargando...</option>';
+    db.collection("porteros").where("equipo", "==", eq).get().then(snap => { sel.innerHTML = '<option value="">Titular...</option>'; snap.forEach(doc => { sel.innerHTML += `<option value="${doc.id}">${doc.data().nombre}</option>`; }); });
 }
 window.iniciarLivePro = function() {
     const eq = document.getElementById('conf-equipo').value; const riv = document.getElementById('conf-rival').value; const titId = document.getElementById('conf-portero-titular').value;
     if(!eq || !riv || !titId) return alert("Faltan datos");
     localStorage.removeItem('guardian_live_backup');
     if(partidoLive.crono.int) clearInterval(partidoLive.crono.int);
-    partidoLive = { config: { equipo: eq, rival: riv, titular: titId, tipo: document.getElementById('conf-tipo').value, fecha: document.getElementById('conf-fecha').value, jornada: document.getElementById('conf-jornada').value, dificultad: document.getElementById('conf-dificultad').value, entrenador: document.getElementById('conf-entrenador').value, campo: document.getElementById('conf-campo').value, condicion: document.getElementById('conf-condicion').value }, acciones: [], marcador: {local:0, rival:0}, porterosJugaron: [titId], minutosJugados: {}, porteroActualId: titId, parteActual: 'Pre-Partido', crono: {seg:0, int:null, run:false, startTs:0, savedSeg:0, lastUpdate:0} };
+    
+    // Iniciar con clima si ya se habia buscado antes
+    const wBtn = document.getElementById('weather-widget');
+    const climaGuardado = wBtn.innerText.includes('°C') ? wBtn.innerText : '';
+
+    partidoLive = { config: { foco:'', clima: climaGuardado, equipo: eq, rival: riv, titular: titId, tipo: document.getElementById('conf-tipo').value, fecha: document.getElementById('conf-fecha').value, jornada: document.getElementById('conf-jornada').value, dificultad: document.getElementById('conf-dificultad').value, entrenador: document.getElementById('conf-entrenador').value, campo: document.getElementById('conf-campo').value, condicion: document.getElementById('conf-condicion').value }, acciones: [], marcador: {local:0, rival:0}, porterosJugaron: [titId], minutosJugados: {}, porteroActualId: titId, parteActual: 'Pre-Partido', crono: {seg:0, int:null, run:false, startTs:0, savedSeg:0, lastUpdate:0} };
     partidoLive.minutosJugados[titId] = 0;
+    
     document.getElementById('live-equipo-local').innerText = eq; document.getElementById('live-equipo-rival').innerText = riv; document.getElementById('score-local').innerText = '0'; document.getElementById('score-rival').innerText = '0'; document.getElementById('crono').innerText = '00:00'; document.getElementById('live-log').innerHTML = '';
+    document.getElementById('live-foco').value = '';
+    limpiarDashboardTactico();
+    recalcularKPIs();
+
     window.actualizarUI(); categoriaAccionActiva = "DEFENSIVAS"; window.renderizarPanelAcciones(); window.cerrarModal('modal-config-partido'); window.cambiarSeccion('live'); guardarEstadoLive();
 }
 window.actualizarUI = function() {
     if(!partidoLive.porteroActualId) return;
     document.getElementById('live-portero-nombre').innerText = "Cargando...";
     db.collection("porteros").doc(String(partidoLive.porteroActualId)).get().then(doc => {
-        if(doc.exists) { const p = doc.data(); document.getElementById('live-portero-nombre').innerText = p.nombre; document.getElementById('live-portero-foto').src = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4="; }
+        if(doc.exists) { const p = doc.data(); document.getElementById('live-portero-nombre').innerText = p.nombre; document.getElementById('live-portero-foto').src = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4="; recalcularKPIs(); }
     });
 }
 window.controlCrono = function(act) {
@@ -318,55 +293,56 @@ window.controlCrono = function(act) {
 window.updCrono = function() { const m = Math.floor(partidoLive.crono.seg/60); const s = partidoLive.crono.seg%60; document.getElementById('crono').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
 
 window.deshacerUltimaAccion = function() {
-    if (partidoLive.acciones.length === 0) return alert("No hay acciones registradas para deshacer.");
-    
+    if (partidoLive.acciones.length === 0) return alert("No hay acciones para deshacer.");
     if (confirm("¿Deshacer el último registro?")) {
         const ultima = partidoLive.acciones.pop(); 
+        if (ultima.tipo === 'GOL_FAVOR') { partidoLive.marcador.local = Math.max(0, partidoLive.marcador.local - 1); document.getElementById('score-local').innerText = partidoLive.marcador.local; } 
+        else if (ultima.tipo === 'GOL_CONTRA') { partidoLive.marcador.rival = Math.max(0, partidoLive.marcador.rival - 1); document.getElementById('score-rival').innerText = partidoLive.marcador.rival; }
 
-        if (ultima.tipo === 'GOL_FAVOR') {
-            partidoLive.marcador.local = Math.max(0, partidoLive.marcador.local - 1);
-            document.getElementById('score-local').innerText = partidoLive.marcador.local;
-        } else if (ultima.tipo === 'GOL_CONTRA') {
-            partidoLive.marcador.rival = Math.max(0, partidoLive.marcador.rival - 1);
-            document.getElementById('score-rival').innerText = partidoLive.marcador.rival;
-        }
-
-        const log = document.getElementById('live-log');
-        log.innerHTML = '';
+        const log = document.getElementById('live-log'); log.innerHTML = '';
         partidoLive.acciones.forEach(ev => {
-            let cl='',ic=''; 
-            if(ev.tipo==='ACCION'){cl=ev.res==='CORRECTO'?'log-ok':'log-error';ic=ev.res==='CORRECTO'?'✅':'❌';}
-            if(ev.tipo==='GOL_FAVOR'){cl='log-gol-atm';ic='⚽';} 
-            if(ev.tipo==='GOL_CONTRA'){cl='log-gol-rival';ic='🥅';} 
-            if(ev.tipo==='GOL_ANULADO'){cl='log-anulado';ic='🚫';}
+            let cl='',ic=''; if(ev.tipo==='ACCION'){cl=ev.res==='CORRECTO'?'log-ok':'log-error';ic=ev.res==='CORRECTO'?'✅':'❌';}
+            if(ev.tipo==='GOL_FAVOR'){cl='log-gol-atm';ic='⚽';} if(ev.tipo==='GOL_CONTRA'){cl='log-gol-rival';ic='🥅';} if(ev.tipo==='GOL_ANULADO'){cl='log-anulado';ic='🚫';}
             if(ev.tipo==='HITO'){ log.innerHTML=`<div class="log-item" style="background:#444;color:white;justify-content:center;"><strong>${ev.nom}</strong></div>` + log.innerHTML; return; }
             log.innerHTML=`<div class="log-item ${cl}"><div><strong>${ev.min}</strong> ${ev.nom} (${ev.pnom})</div><div>${ic}</div></div>`+log.innerHTML;
         });
-
+        recalcularKPIs();
         guardarEstadoLive();
     }
 }
 
-// FUNCION PARA ANIMAR EL MARCADOR
 function animarMarcador(equipo) {
     const el = document.getElementById(`score-${equipo}`);
     const animClass = equipo === 'local' ? 'goal-anim-local' : 'goal-anim-rival';
-    el.classList.remove(animClass);
-    void el.offsetWidth; // forzar reflow
-    el.classList.add(animClass);
+    el.classList.remove(animClass); void el.offsetWidth; el.classList.add(animClass);
     setTimeout(() => el.classList.remove(animClass), 600);
 }
 
 window.regEv = function(tipo, nom, res=null, obs=null) {
     const min = Math.floor(partidoLive.crono.seg/60)+1;
-    const ev = {id:Date.now(), min:min+"'", parte:partidoLive.parteActual, seg:partidoLive.crono.seg, tipo, nom, pid:partidoLive.porteroActualId, pnom:'...', res, obs};
+    
+    // AÑADIR CONTEXTO DASHBOARD AL OBS
+    let extraObs = [];
+    if(zonaSeleccionada) extraObs.push(`[Z: ${zonaSeleccionada}]`);
+    if(modificadoresActivos.length > 0) extraObs.push(`[Mods: ${modificadoresActivos.join(', ')}]`);
+    
+    let finalObs = obs || "";
+    if(extraObs.length > 0) {
+        finalObs = extraObs.join(" ") + (finalObs ? ` - ${finalObs}` : "");
+    }
+
+    const ev = {id:Date.now(), min:min+"'", parte:partidoLive.parteActual, seg:partidoLive.crono.seg, tipo, nom, pid:partidoLive.porteroActualId, pnom:'...', res, obs: finalObs};
     if(partidoLive.porteroActualId) ev.pnom = document.getElementById('live-portero-nombre').innerText;
     partidoLive.acciones.push(ev);
+    
     const log = document.getElementById('live-log'); let cl='',ic='';
     if(tipo==='ACCION'){cl=res==='CORRECTO'?'log-ok':'log-error';ic=res==='CORRECTO'?'✅':'❌';}
     if(tipo==='GOL_FAVOR'){cl='log-gol-atm';ic='⚽';} if(tipo==='GOL_CONTRA'){cl='log-gol-rival';ic='🥅';} if(tipo==='GOL_ANULADO'){cl='log-anulado';ic='🚫';}
     if(tipo==='HITO') { log.innerHTML=`<div class="log-item" style="background:#444;color:white;justify-content:center;"><strong>${nom}</strong></div>` + log.innerHTML; } 
     else { log.innerHTML=`<div class="log-item ${cl}"><div><strong>${ev.min}</strong> ${nom} (${ev.pnom})</div><div>${ic}</div></div>`+log.innerHTML; }
+    
+    recalcularKPIs();
+    limpiarDashboardTactico();
     guardarEstadoLive();
 }
 
@@ -375,28 +351,16 @@ window.renderizarPanelAcciones = function() {
     const tabs = document.createElement('div'); tabs.className='tabs-container';
     Object.keys(CATALOGO_ACCIONES).forEach(k => { const btn = document.createElement('button'); btn.innerText = k; btn.className = `tab-btn ${categoriaAccionActiva===k?'active':''}`; btn.dataset.cat = CATALOGO_ACCIONES[k].id; btn.onclick = () => { categoriaAccionActiva = k; window.renderizarPanelAcciones(); }; tabs.appendChild(btn); });
     panel.appendChild(tabs);
-    
-    const gr = CATALOGO_ACCIONES[categoriaAccionActiva].grupos; 
-    const catId = CATALOGO_ACCIONES[categoriaAccionActiva].id;
-    
+    const gr = CATALOGO_ACCIONES[categoriaAccionActiva].grupos; const catId = CATALOGO_ACCIONES[categoriaAccionActiva].id;
     Object.keys(gr).forEach(gName => {
         let acciones = gr[gName];
         if (acciones && acciones.length > 0) {
             const tit = document.createElement('div'); tit.className='action-group-title'; tit.innerText=gName; panel.appendChild(tit);
             const grid = document.createElement('div'); grid.className='actions-grid-new';
-            
             acciones.forEach(act => { 
-                const b = document.createElement('button'); 
-                b.className=`action-btn-new btn-${catId}`; 
-                
-                let iconHTML = '';
-                if (iconosPersonalizados[act]) {
-                    iconHTML = `<span class="material-symbols-outlined">${iconosPersonalizados[act]}</span>`;
-                }
-                
-                b.innerHTML = `${iconHTML}<span>${act}</span>`;
-                b.onclick = () => window.prepararAccion(act); 
-                grid.appendChild(b); 
+                const b = document.createElement('button'); b.className=`action-btn-new btn-${catId}`; 
+                let iconHTML = ''; if (iconosPersonalizados[act]) { iconHTML = `<span class="material-symbols-outlined">${iconosPersonalizados[act]}</span>`; }
+                b.innerHTML = `${iconHTML}<span>${act}</span>`; b.onclick = () => window.prepararAccion(act); grid.appendChild(b); 
             });
             panel.appendChild(grid);
         }
@@ -409,83 +373,44 @@ window.guardarAccionLive = function(r) { window.regEv('ACCION', accionTemporal, 
 window.gestionarGol = function(equipo, accion) {
     if(!partidoLive.crono.run) return alert("Crono parado");
     if(equipo === 'local') { 
-        if(accion === 'sumar') { 
-            partidoLive.marcador.local++; 
-            animarMarcador('local');
-            window.regEv('GOL_FAVOR', 'Gol ATM'); 
-        } else { 
-            if(partidoLive.marcador.local>0) { partidoLive.marcador.local--; window.regEv('GOL_ANULADO', 'Gol ATM Anulado'); } 
-        } 
+        if(accion === 'sumar') { partidoLive.marcador.local++; animarMarcador('local'); window.regEv('GOL_FAVOR', 'Gol ATM'); } 
+        else { if(partidoLive.marcador.local>0) { partidoLive.marcador.local--; window.regEv('GOL_ANULADO', 'Gol ATM Anulado'); } } 
         document.getElementById('score-local').innerText = partidoLive.marcador.local; 
     } else { 
-        if(accion === 'sumar') { 
-            document.getElementById('modal-gol-rival').style.display='flex'; 
-        } else { 
-            if(partidoLive.marcador.rival>0) { partidoLive.marcador.rival--; window.regEv('GOL_ANULADO', 'Gol Rival Anulado'); document.getElementById('score-rival').innerText = partidoLive.marcador.rival; } 
-        } 
+        if(accion === 'sumar') { document.getElementById('modal-gol-rival').style.display='flex'; } 
+        else { if(partidoLive.marcador.rival>0) { partidoLive.marcador.rival--; window.regEv('GOL_ANULADO', 'Gol Rival Anulado'); document.getElementById('score-rival').innerText = partidoLive.marcador.rival; recalcularKPIs(); } } 
     }
     guardarEstadoLive();
 }
 
 window.registrarGolContra = function(isError) {
-    partidoLive.marcador.rival++; 
-    document.getElementById('score-rival').innerText = partidoLive.marcador.rival;
-    animarMarcador('rival');
-    
+    partidoLive.marcador.rival++; document.getElementById('score-rival').innerText = partidoLive.marcador.rival; animarMarcador('rival');
     let obs = isError ? "ERROR: " + document.getElementById('gol-error-detalle').value : "";
     window.regEv('GOL_CONTRA', 'Gol Rival', isError?'ERROR':null, obs);
     document.getElementById('div-error-detalle').style.display='none'; document.getElementById('gol-error-detalle').value=''; document.getElementById('modal-gol-rival').style.display='none';
-    guardarEstadoLive();
+    guardarEstadoLive(); // regEv ya llama a recalcularKPIs
 }
 window.mostrarInputError = function() { document.getElementById('div-error-detalle').style.display='block'; }
 
-// CAMBIO DE PORTERO VISUAL
 window.abrirModalCambio = function() {
     if(!partidoLive.crono.run && partidoLive.parteActual!=='Descanso') return alert("Solo en juego o descanso");
-    
     db.collection("porteros").get().then(snap => {
-        const grid = document.getElementById('grid-cambio-porteros'); 
-        grid.innerHTML='';
-        porteroSeleccionadoParaCambio = null;
-        document.getElementById('btn-conf-cambio').disabled = true;
-
+        const grid = document.getElementById('grid-cambio-porteros'); grid.innerHTML=''; porteroSeleccionadoParaCambio = null; document.getElementById('btn-conf-cambio').disabled = true;
         let count = 0;
         snap.forEach(doc => { 
             const p = doc.data(); 
             if(p.equipo === partidoLive.config.equipo && doc.id !== partidoLive.porteroActualId) { 
                 const foto = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4=";
-                
-                // Usamos la nueva clase sub-card-name para asegurar visibilidad en cualquier modo
-                grid.innerHTML += `
-                <div class="sub-card" id="sub-${doc.id}" onclick="window.seleccionarSuplente('${doc.id}')">
-                    <img src="${foto}">
-                    <div class="sub-card-name">${p.nombre}</div>
-                </div>`; 
-                count++; 
+                grid.innerHTML += `<div class="sub-card" id="sub-${doc.id}" onclick="window.seleccionarSuplente('${doc.id}')"><img src="${foto}"><div class="sub-card-name">${p.nombre}</div></div>`; count++; 
             } 
         });
-        if(count === 0) return alert("No hay porteros suplentes configurados en este equipo.");
-        document.getElementById('modal-cambio').style.display='flex';
+        if(count === 0) return alert("No hay suplentes en este equipo."); document.getElementById('modal-cambio').style.display='flex';
     });
 }
-
-window.seleccionarSuplente = function(id) {
-    porteroSeleccionadoParaCambio = id;
-    document.querySelectorAll('.sub-card').forEach(el => el.classList.remove('selected'));
-    document.getElementById(`sub-${id}`).classList.add('selected');
-    document.getElementById('btn-conf-cambio').disabled = false;
-}
-
+window.seleccionarSuplente = function(id) { porteroSeleccionadoParaCambio = id; document.querySelectorAll('.sub-card').forEach(el => el.classList.remove('selected')); document.getElementById(`sub-${id}`).classList.add('selected'); document.getElementById('btn-conf-cambio').disabled = false; }
 window.confirmarCambio = function() {
-    if(!porteroSeleccionadoParaCambio) return;
-    const pid = porteroSeleccionadoParaCambio;
-    
-    if(partidoLive.crono.run && partidoLive.porteroActualId) {
-        const now = Date.now(); const delta = (now - partidoLive.crono.lastUpdate)/1000;
-        if(!partidoLive.minutosJugados[partidoLive.porteroActualId]) partidoLive.minutosJugados[partidoLive.porteroActualId] = 0;
-        partidoLive.minutosJugados[partidoLive.porteroActualId] += delta; partidoLive.crono.lastUpdate = now;
-    }
-    
+    if(!porteroSeleccionadoParaCambio) return; const pid = porteroSeleccionadoParaCambio;
+    if(partidoLive.crono.run && partidoLive.porteroActualId) { const now = Date.now(); const delta = (now - partidoLive.crono.lastUpdate)/1000; if(!partidoLive.minutosJugados[partidoLive.porteroActualId]) partidoLive.minutosJugados[partidoLive.porteroActualId] = 0; partidoLive.minutosJugados[partidoLive.porteroActualId] += delta; partidoLive.crono.lastUpdate = now; }
     db.collection("porteros").doc(pid).get().then(doc => {
         const entra = doc.data(); partidoLive.porteroActualId = pid;
         if(!partidoLive.porterosJugaron.includes(pid)) partidoLive.porterosJugaron.push(pid);
@@ -515,6 +440,11 @@ function recuperarPartidoEnCurso() {
             window.cambiarSeccion('live');
             document.getElementById('live-equipo-local').innerText = st.config.equipo; document.getElementById('live-equipo-rival').innerText = st.config.rival;
             document.getElementById('score-local').innerText = st.marcador.local; document.getElementById('score-rival').innerText = st.marcador.rival;
+            
+            // Cargar Foco y Clima
+            document.getElementById('live-foco').value = st.config.foco || "";
+            if (st.config.clima) document.getElementById('weather-widget').innerText = st.config.clima;
+            
             const log = document.getElementById('live-log'); log.innerHTML = '';
             st.acciones.forEach(ev => {
                 let cl='',ic=''; if(ev.tipo==='ACCION'){cl=ev.res==='CORRECTO'?'log-ok':'log-error';ic=ev.res==='CORRECTO'?'✅':'❌';}
@@ -532,6 +462,8 @@ function recuperarPartidoEnCurso() {
         } else { localStorage.removeItem('guardian_live_backup'); }
     }
 }
+
+// INYECTAR CLIMA Y FOCO EN EL PDF
 window.prepararVistaPreviaPDF = function() {
     const cfg = partidoLive.config;
     let analisisData = {};
@@ -546,6 +478,7 @@ window.prepararVistaPreviaPDF = function() {
 }
 function generarHTMLPartido(datos, listaP, anaData) {
     const cfg = datos.config; let porterosHTML = ''; let analisisHTML = '';
+    
     datos.porterosJugaron.forEach(pid => {
         const p = listaP.find(x => x.id == pid); if(!p) return;
         const acs = datos.acciones.filter(a => a.pid == pid && a.tipo === 'ACCION');
@@ -556,6 +489,7 @@ function generarHTMLPartido(datos, listaP, anaData) {
         const a = anaData[pid] || {pos:'', neg:'', tras:''};
         analisisHTML += `<div class="pdf-obs-box"><div class="pdf-obs-header">${p.nombre} (${mins}')</div><div style="font-size:11px; margin-bottom:5px;"><strong>(+)</strong> ${a.pos||"-"}</div><div style="font-size:11px; margin-bottom:5px;"><strong>(-)</strong> ${a.neg||"-"}</div><div style="font-size:11px;"><strong>Trascendencia:</strong> ${a.tras||"-"}</div></div>`;
     });
+    
     let cronoHTML = '';
     const sorted = [...datos.acciones].sort((a,b)=>a.seg - b.seg);
     sorted.forEach(ev => {
@@ -567,7 +501,8 @@ function generarHTMLPartido(datos, listaP, anaData) {
             cronoHTML += `<tr class="${cl}"><td><strong>${ev.min}</strong></td><td class="pdf-crono-evento">${ev.nom}</td><td>${ev.pnom}</td><td>${resTxt}</td><td style="font-size:10px;">${ev.obs||''}</td></tr>`;
         }
     });
-    return `<div class="pdf-container"><div class="pdf-header-pro"><img src="ESCUDO ATM.png" class="pdf-logo"><div class="pdf-title-box"><h1>ATLÉTICO DE MADRID</h1><h2>SEGUIMIENTO DE PORTEROS</h2></div></div><div class="pdf-divider-red"></div><div class="pdf-section-pro"><h3 class="pdf-section-title">INFORMACIÓN DEL PARTIDO</h3><table class="pdf-table-info"><tr><td><strong>Equipo:</strong> ${cfg.equipo}</td><td><strong>Categoría:</strong> ${cfg.tipo}</td><td><strong>Tipo:</strong> ${cfg.tipo}</td><td><strong>Jornada:</strong> ${cfg.jornada}</td></tr><tr><td><strong>Rival:</strong> ${cfg.rival}</td><td><strong>Fecha:</strong> ${cfg.fecha}</td><td><strong>Dificultad:</strong> ${cfg.dificultad}</td><td><strong>Entrenador:</strong> ${cfg.entrenador}</td></tr><tr><td><strong>Campo:</strong> ${cfg.campo}</td><td><strong>Condición:</strong> ${cfg.condicion}</td><td colspan="2"></td></tr><tr><td colspan="4" style="background-color: #f4f4f4; text-align: center; font-size: 14px; padding: 10px;"><strong>RESULTADO:</strong> ATM <span style="color:#CB3524; font-size:16px; font-weight:bold">${datos.marcador.local}</span> - <span style="color:#CB3524; font-size:16px; font-weight:bold">${datos.marcador.rival}</span> RIVAL</td></tr></table></div><div class="pdf-section-pro"><h3 class="pdf-section-title">PORTEROS Y ESTADÍSTICAS</h3>${porterosHTML}</div><div class="pdf-section-pro"><h3 class="pdf-section-title">REGISTRO CRONOLÓGICO</h3><table class="pdf-crono-table"><thead><tr><th>Min</th><th>Acción</th><th>Portero</th><th>Calif.</th><th>Obs.</th></tr></thead><tbody>${cronoHTML}</tbody></table></div><div class="pdf-section-pro"><h3 class="pdf-section-title">ANÁLISIS TÉCNICO INDIVIDUAL</h3>${analisisHTML}</div><div class="pdf-footer"><p>Guardian Lab ATM Pro - Informe Técnico</p></div></div>`;
+    
+    return `<div class="pdf-container"><div class="pdf-header-pro"><img src="ESCUDO ATM.png" class="pdf-logo"><div class="pdf-title-box"><h1>ATLÉTICO DE MADRID</h1><h2>SEGUIMIENTO DE PORTEROS</h2></div></div><div class="pdf-divider-red"></div><div class="pdf-section-pro"><h3 class="pdf-section-title">INFORMACIÓN DEL PARTIDO</h3><table class="pdf-table-info"><tr><td><strong>Equipo:</strong> ${cfg.equipo}</td><td><strong>Categoría:</strong> ${cfg.tipo}</td><td><strong>Tipo:</strong> ${cfg.tipo}</td><td><strong>Jornada:</strong> ${cfg.jornada}</td></tr><tr><td><strong>Rival:</strong> ${cfg.rival}</td><td><strong>Fecha:</strong> ${cfg.fecha}</td><td><strong>Dificultad:</strong> ${cfg.dificultad}</td><td><strong>Entrenador:</strong> ${cfg.entrenador}</td></tr><tr><td><strong>Campo:</strong> ${cfg.campo}</td><td><strong>Condición:</strong> ${cfg.condicion}</td><td colspan="2"><strong>Clima:</strong> ${cfg.clima || '-'}</td></tr><tr><td colspan="4" style="background-color: #f4f4f4; text-align: center; font-size: 14px; padding: 10px;"><strong>RESULTADO:</strong> ATM <span style="color:#CB3524; font-size:16px; font-weight:bold">${datos.marcador.local}</span> - <span style="color:#CB3524; font-size:16px; font-weight:bold">${datos.marcador.rival}</span> RIVAL</td></tr></table></div><div class="pdf-section-pro"><h3 class="pdf-section-title">FOCO TÁCTICO</h3><div style="font-size:12px; font-style:italic; margin-bottom:15px; border-left:3px solid #1C2C5B; padding-left:10px;">${cfg.foco || 'Sin foco definido.'}</div></div><div class="pdf-section-pro"><h3 class="pdf-section-title">PORTEROS Y ESTADÍSTICAS</h3>${porterosHTML}</div><div class="pdf-section-pro"><h3 class="pdf-section-title">REGISTRO CRONOLÓGICO</h3><table class="pdf-crono-table"><thead><tr><th>Min</th><th>Acción</th><th>Portero</th><th>Calif.</th><th>Obs.</th></tr></thead><tbody>${cronoHTML}</tbody></table></div><div class="pdf-section-pro"><h3 class="pdf-section-title">ANÁLISIS TÉCNICO INDIVIDUAL</h3>${analisisHTML}</div><div class="pdf-footer"><p>Guardian Lab ATM Pro - Informe Técnico</p></div></div>`;
 }
 window.imprimirPDFNativo = function() { window.print(); }
 function cargarPartidosHistorial() {
