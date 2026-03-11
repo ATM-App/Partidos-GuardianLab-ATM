@@ -86,12 +86,10 @@
                         <button onclick="window.gestionarGol('local', 'sumar')" class="di-btn plus"><span class="material-symbols-outlined">add</span></button>
                     </div>
                 </div>
-                
                 <div class="di-center">
                     <span id="crono" class="di-crono">00:00</span>
                     <span id="live-parte-txt" class="di-parte">Pre-Partido</span>
                 </div>
-                
                 <div class="di-side rival">
                     <div class="di-btn-group">
                         <button onclick="window.gestionarGol('rival', 'restar')" class="di-btn minus"><span class="material-symbols-outlined">remove</span></button>
@@ -112,13 +110,43 @@
             </div>
 
             <div class="live-controls modern-card" style="margin-top:15px;">
-                <div class="row" style="align-items: center;">
-                    <div style="flex:1; display:flex; align-items:center; gap:15px;">
+                <div class="elite-dashboard">
+                    <div class="dash-profile">
                         <img id="live-portero-foto" src="" class="mini-foto-live">
                         <div style="display:flex; flex-direction:column; gap:5px;">
-                            <span id="live-portero-nombre" style="font-weight:800; color:var(--atm-red); font-size:1.15rem; line-height: 1;">Portero</span>
+                            <span id="live-portero-nombre" class="dash-name">Portero</span>
                             <span id="live-minutos" class="badge-minutes"><span class="material-symbols-outlined" style="font-size:16px;">timer</span> 0'</span>
                         </div>
+                    </div>
+                    
+                    <div class="dash-kpis">
+                        <div class="kpi-group">
+                            <div class="kpi-box"><span>Acciones</span><strong id="kpi-acciones">0</strong></div>
+                            <div class="kpi-box highlight"><span>Acierto</span><strong id="kpi-acierto">0%</strong></div>
+                            <div class="kpi-box"><span>Goles</span><strong id="kpi-goles">0</strong></div>
+                        </div>
+                        <button id="weather-widget" class="weather-btn" onclick="window.obtenerClima()">
+                            <span class="material-symbols-outlined">partly_cloudy_day</span> Obtener Clima
+                        </button>
+                    </div>
+
+                    <div class="dash-tactics">
+                        <div style="display:flex; gap:10px;">
+                            <div class="mini-goal" id="mini-goal">
+                                <div class="goal-zone" onclick="window.selectZone(this, 'Arriba Izq')"></div>
+                                <div class="goal-zone" onclick="window.selectZone(this, 'Arriba Cen')"></div>
+                                <div class="goal-zone" onclick="window.selectZone(this, 'Arriba Der')"></div>
+                                <div class="goal-zone" onclick="window.selectZone(this, 'Abajo Izq')"></div>
+                                <div class="goal-zone" onclick="window.selectZone(this, 'Abajo Cen')"></div>
+                                <div class="goal-zone" onclick="window.selectZone(this, 'Abajo Der')"></div>
+                            </div>
+                            <div class="quick-mods">
+                                <button class="q-mod" onclick="window.toggleMod(this, '🔥 Presión')">🔥</button>
+                                <button class="q-mod" onclick="window.toggleMod(this, '👁️ Tapado')">👁️</button>
+                                <button class="q-mod" onclick="window.toggleMod(this, '🌧️ Resbalo')">🌧️</button>
+                            </div>
+                        </div>
+                        <textarea id="live-foco" class="foco-input" placeholder="🎯 Foco: Ej. Salidas aéreas..." onchange="window.guardarFoco()"></textarea>
                     </div>
                 </div>
             </div>
@@ -193,10 +221,7 @@
     <div id="modal-cambio" class="modal"><div class="modal-content modern-card" style="text-align:center;">
             <span class="close-btn" onclick="window.cerrarModal('modal-cambio')">&times;</span>
             <h3 style="color:var(--atm-red); margin-bottom:15px;">Seleccionar Suplente</h3>
-            
-            <div id="grid-cambio-porteros" class="subs-grid">
-                </div>
-            
+            <div id="grid-cambio-porteros" class="subs-grid"></div>
             <button onclick="window.confirmarCambio()" class="btn-main" style="background:var(--atm-blue)" id="btn-conf-cambio" disabled>Confirmar Cambio</button>
     </div></div>
     
@@ -221,7 +246,6 @@
             <span>Conceptos</span>
         </button>
     </nav>
-    
     <div id="printable-area" class="printable-hidden"></div>
     
     <script src="app.js"></script>
