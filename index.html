@@ -156,6 +156,12 @@
             <div id="lista-conceptos-custom" class="list-vertical"></div>
         </section>
 
+        <section id="section-datos" class="fade-in" style="display:none;">
+            <div class="section-header"><h2>Estadísticas</h2></div>
+            <div class="modern-card"><select id="select-stats-portero" onchange="window.actualizarGrafica()" class="full-width"><option value="">-- Elegir Portero --</option></select></div>
+            <div class="kpi-grid"><div class="kpi-card"><div class="kpi-value" id="kpi-media">-</div><div class="kpi-label">Nota Media</div></div><div class="kpi-card"><div class="kpi-value" id="kpi-clean-sheets">-</div><div class="kpi-label">Reportes</div></div></div>
+            <div class="modern-card chart-container"><canvas id="graficaRendimiento"></canvas></div>
+        </section>
     </main>
 
     <div id="modal-config-partido" class="modal">
@@ -172,19 +178,8 @@
     <div id="modal-cambio" class="modal"><div class="modal-content modern-card"><span class="close-btn" onclick="window.cerrarModal('modal-cambio')">&times;</span><h3>Realizar Cambio</h3><select id="select-cambio-portero" class="full-width"><option>Cargando...</option></select><button onclick="window.confirmarCambio()" class="btn-main" style="background:var(--atm-blue)">Confirmar Cambio</button></div></div>
     <div id="modal-gol-rival" class="modal"><div class="modal-content modern-card" style="border-color: #ffaa00;"><h3>Gol en Contra</h3><div class="row"><button onclick="window.registrarGolContra(false)" class="btn-main" style="background:#444">NO ERROR</button><button onclick="window.mostrarInputError()" class="btn-main" style="background:var(--atm-red)">SÍ, ERROR</button></div><div id="div-error-detalle" style="display:none; margin-top:15px;"><input type="text" id="gol-error-detalle" placeholder="Detalle..."><button onclick="window.registrarGolContra(true)" class="btn-main">Confirmar</button></div></div></div>
     
-    <div id="modal-accion" class="modal">
-        <div class="modal-content modern-card" style="text-align:center; position:relative;">
-            <span class="close-btn" onclick="window.cerrarModal('modal-accion'); document.getElementById('accion-obs').value='';" style="position:absolute; top:10px; right:15px;">&times;</span>
-            
-            <h3 id="accion-titulo" style="color:var(--atm-red); margin-bottom:20px; margin-top:10px;">Acción</h3>
-            <div class="row">
-                <button onclick="window.guardarAccionLive('CORRECTO')" class="btn-main" style="background:#00ff88; color:black">✅ Correcto</button>
-                <button onclick="window.guardarAccionLive('ERROR')" class="btn-main" style="background:var(--atm-red)">❌ Error</button>
-            </div>
-            <input type="text" id="accion-obs" placeholder="Observación (opcional)" style="margin-top:15px">
-        </div>
-    </div>
-
+    <div id="modal-accion" class="modal"><div class="modal-content modern-card" style="text-align:center; position:relative;"><span class="close-btn" onclick="window.cerrarModal('modal-accion'); document.getElementById('accion-obs').value='';" style="position:absolute; top:10px; right:15px; font-size:28px;">&times;</span><h3 id="accion-titulo" style="color:var(--atm-red); margin-bottom:20px; margin-top:15px;">Acción</h3><div class="row"><button onclick="window.guardarAccionLive('CORRECTO')" class="btn-main" style="background:#00ff88; color:black">✅ Correcto</button><button onclick="window.guardarAccionLive('ERROR')" class="btn-main" style="background:var(--atm-red)">❌ Error</button></div><input type="text" id="accion-obs" placeholder="Observación (opcional)" style="margin-top:15px"></div></div>
+    
     <div id="modal-fin-partido" class="modal"><div class="modal-content modern-card" style="max-width:600px"><h3>Resumen del Partido</h3><div class="row" style="margin-bottom:15px; background:rgba(0,0,0,0.2); padding:10px; border-radius:10px; justify-content: space-around; align-items: center;"><span style="font-weight:bold">ATM</span><span id="fin-res-local" style="font-size:1.5rem; font-weight:800; color:var(--atm-red)">0</span><span style="font-weight:bold">-</span><span id="fin-res-rival" style="font-size:1.5rem; font-weight:800; color:var(--atm-red)">0</span><span style="font-weight:bold">RIVAL</span></div><div id="container-analisis-porteros" style="max-height: 400px; overflow-y:auto; margin-bottom:15px;"></div><button onclick="window.prepararVistaPreviaPDF()" class="btn-main" style="background: linear-gradient(135deg, #00ff88, #00cc6a); color:black; margin-top:10px;">📄 Generar Vista Previa</button></div></div>
     <div id="modal-editar-analisis" class="modal"><div class="modal-content modern-card" style="max-width:600px"><span class="close-btn" onclick="window.cerrarModal('modal-editar-analisis')">&times;</span><h3>Editar Análisis Técnico</h3><div id="container-editar-analisis" style="max-height: 400px; overflow-y:auto; margin-bottom:15px;"></div><button onclick="window.guardarEdicionAnalisis()" class="btn-main" style="background: var(--atm-blue)">💾 Guardar Cambios</button></div></div>
     <div id="modal-pdf-preview" class="modal" style="background: rgba(10,10,10,0.98); z-index: 2000;"><div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center;"><div style="width:100%; display:flex; justify-content:center; align-items:center; padding:15px; background:#111; border-bottom:1px solid #333;"><h3 style="color:white; margin:0 20px 0 0;">Vista Previa</h3><button onclick="window.imprimirPDFNativo()" class="btn-main" style="width:auto; padding:10px 25px; background:white; color:black; font-weight:bold; margin-right:10px;">🖨️ IMPRIMIR / GUARDAR</button><button onclick="window.cerrarModal('modal-pdf-preview')" class="btn-small-red">Cerrar</button></div><div style="flex:1; overflow-y:auto; background:#555; width:100%; display:flex; justify-content:center; padding:40px;"><div id="preview-content"></div></div></div></div>
@@ -194,12 +189,12 @@
         <button onclick="window.cambiarSeccion('sesiones')" id="btn-sesiones">Objetivos</button>
         <button onclick="window.cambiarSeccion('partidos')" id="btn-partidos">Partidos</button>
         <button onclick="window.cambiarSeccion('conceptos')" id="btn-conceptos">+ Conceptos</button>
+        <button onclick="window.cambiarSeccion('datos')" id="btn-datos">Datos</button>
     </nav>
     <div id="printable-area" class="printable-hidden"></div>
     
     <script src="app.js"></script>
     <script>
-    // REGISTRO DE SERVICE WORKER PARA PWA
     if('serviceWorker' in navigator){
         window.addEventListener('load',()=>{
             navigator.serviceWorker.register('./sw.js')
