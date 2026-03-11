@@ -2,14 +2,13 @@
     --bg-body: #111a36; --bg-card: #1F305E; --text-main: #ffffff; --text-sec: #aab2cd; --input-bg: #0b1124;
     --atm-blue: #1C2C5B; --atm-red: #CB3524; --radius-l: 24px; --radius-m: 16px; 
     --col-def: #c0392b; --col-of: #1abc9c; --col-tac: #8e44ad; --col-rein: #f39c12; 
-    --comp-1: #E74C3C; --comp-2: #E67E22; --comp-3: #F1C40F; --comp-4: #27AE60; 
 }
 body.light-mode { --bg-body: #f4f6f8; --bg-card: #ffffff; --text-main: #1c2c5b; --text-sec: #555555; --input-bg: #eef2f5; }
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }
 body { 
     background-color: var(--bg-body); color: var(--text-main); 
     padding-bottom: 110px; transition: background 0.3s, color 0.3s;
-    overscroll-behavior-y: contain; /* FIX TABLET */
+    overscroll-behavior-y: contain; 
 }
 header { background: linear-gradient(180deg, var(--atm-blue) 0%, rgba(17,26,54,0) 100%); padding: 25px 20px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center; }
 .header-content { display: flex; align-items: center; gap: 15px; }
@@ -23,7 +22,7 @@ main { padding: 0 20px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 h2 { font-size: 1.2rem; font-weight: 700; }
 .badge { background-color: var(--atm-red); padding: 2px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; color: white; }
-.portero-card, .match-card, .eval-card { background-color: var(--bg-card); border-radius: var(--radius-m); padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--atm-red); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+.portero-card, .match-card { background-color: var(--bg-card); border-radius: var(--radius-m); padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--atm-red); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
 .mini-foto-list { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--atm-red); margin-right: 15px; }
 .card-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 5px; color: var(--text-main); }
 .card-subtitle { font-size: 0.85rem; color: var(--text-sec); }
@@ -93,14 +92,6 @@ input[type="file"] { display: none; }
 .btn-gol { flex: 1; padding: 12px; border: none; border-radius: var(--radius-m); font-weight: 800; cursor: pointer; font-size: 0.9rem; }
 .btn-gol.favor { background: linear-gradient(135deg, #00ff88, #00cc6a); color: black; }
 .btn-gol.contra { background: linear-gradient(135deg, #CB3524, #a02315); color: white; }
-.competencia-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 5px; }
-.btn-comp { padding: 12px; border: none; border-radius: var(--radius-m); color: white; font-weight: bold; font-size: 0.7rem; cursor: pointer; opacity: 0.5; transition: 0.2s; }
-.btn-comp:hover { opacity: 0.8; }
-.btn-comp.active { opacity: 1; box-shadow: 0 0 0 2px white; transform: scale(1.02); }
-.comp-1 { background-color: var(--comp-1); }
-.comp-2 { background-color: var(--comp-2); }
-.comp-3 { background-color: var(--comp-3); color: black; }
-.comp-4 { background-color: var(--comp-4); }
 .item-temp-eval { background: rgba(255,255,255,0.05); border-left: 4px solid #ccc; padding: 10px; margin-bottom: 8px; border-radius: 8px; font-size: 0.85rem; color: var(--text-main); }
 #printable-area { display: none; }
 @media print {
@@ -111,8 +102,6 @@ input[type="file"] { display: none; }
     @page { size: auto; margin: 0mm; }
     .pdf-container * { color: #000000 !important; }
     .pdf-section-title { background-color: #f4f4f4 !important; color: #CB3524 !important; border-left: 6px solid #CB3524 !important; }
-    .pdf-stats-summary { background-color: #1C2C5B !important; color: white !important; }
-    .pdf-stats-summary * { color: white !important; }
     .pdf-title-box h1 { color: #CB3524 !important; }
     .pdf-title-box h2 { color: #1C2C5B !important; }
     .pdf-crono-table th { background-color: #e0e0e0 !important; color: black !important; }
