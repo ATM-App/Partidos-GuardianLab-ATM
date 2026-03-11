@@ -10,7 +10,9 @@
     <link rel="apple-touch-icon" href="GuardianLab-en vivo.png">
     
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0a0f24"> <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#0a0f24"> 
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,600,0,0" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
@@ -147,7 +149,7 @@
             <div class="modern-card form-card">
                 <p style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">Añade nuevas acciones para evaluar en el Partido en Vivo.</p>
                 <div class="row">
-                    <input type="text" id="new-concepto-nombre" placeholder="Nombre (ej: Salida de puños)" style="flex:2">
+                    <input type="text" id="new-concepto-nombre" placeholder="Nombre (ej: Pase con el pecho)" style="flex:2">
                     <select id="new-concepto-tipo" style="flex:2">
                         <option value="LIVE_DEF">Defensivas</option>
                         <option value="LIVE_OF">Ofensivas</option>
@@ -155,7 +157,20 @@
                         <option value="LIVE_REIN">Reincorporaciones</option>
                     </select>
                 </div>
-                <button onclick="window.guardarNuevoConcepto()" class="btn-main" style="background:#00ff88; color:black; font-weight:800; border:2px solid white;">Guardar Acción</button>
+                
+                <label style="font-size:0.8rem; color:var(--text-sec); margin-top:15px; display:block; font-weight:bold;">Elige un icono:</label>
+                <div class="icon-selector" id="icon-selector-container">
+                    <div class="icon-opt selected" onclick="window.seleccionarIcono(this, 'star')"><span class="material-symbols-outlined">star</span></div>
+                    <div class="icon-opt" onclick="window.seleccionarIcono(this, 'sports_handball')"><span class="material-symbols-outlined">sports_handball</span></div>
+                    <div class="icon-opt" onclick="window.seleccionarIcono(this, 'front_hand')"><span class="material-symbols-outlined">front_hand</span></div>
+                    <div class="icon-opt" onclick="window.seleccionarIcono(this, 'pan_tool')"><span class="material-symbols-outlined">pan_tool</span></div>
+                    <div class="icon-opt" onclick="window.seleccionarIcono(this, 'sports_kabaddi')"><span class="material-symbols-outlined">sports_kabaddi</span></div>
+                    <div class="icon-opt" onclick="window.seleccionarIcono(this, 'directions_run')"><span class="material-symbols-outlined">directions_run</span></div>
+                    <div class="icon-opt" onclick="window.seleccionarIcono(this, 'bolt')"><span class="material-symbols-outlined">bolt</span></div>
+                </div>
+                <input type="hidden" id="new-concepto-icon-val" value="star">
+                
+                <button onclick="window.guardarNuevoConcepto()" class="btn-main" style="background:#00ff88; color:black; font-weight:800; border:2px solid white; margin-top: 20px;">Guardar Acción</button>
             </div>
             <h3 class="section-divider">Mis Acciones Personalizadas</h3>
             <div id="lista-conceptos-custom" class="list-vertical"></div>
@@ -175,7 +190,17 @@
         </div>
     </div>
     
-    <div id="modal-cambio" class="modal"><div class="modal-content modern-card"><span class="close-btn" onclick="window.cerrarModal('modal-cambio')">&times;</span><h3>Realizar Cambio</h3><select id="select-cambio-portero" class="full-width"><option>Cargando...</option></select><button onclick="window.confirmarCambio()" class="btn-main" style="background:var(--atm-blue)">Confirmar Cambio</button></div></div>
+    <div id="modal-cambio" class="modal">
+        <div class="modal-content modern-card" style="text-align:center;">
+            <span class="close-btn" onclick="window.cerrarModal('modal-cambio')">&times;</span>
+            <h3 style="color:var(--atm-red); margin-bottom:15px;">Seleccionar Suplente</h3>
+            
+            <div id="grid-cambio-porteros" class="subs-grid">
+                </div>
+            
+            <button onclick="window.confirmarCambio()" class="btn-main" style="background:var(--atm-blue)" id="btn-conf-cambio" disabled>Confirmar Cambio</button>
+        </div>
+    </div>
     
     <div id="modal-gol-rival" class="modal"><div class="modal-content modern-card" style="border-color: #ffaa00;"><h3>Gol en Contra</h3><div class="row"><button onclick="window.registrarGolContra(false)" class="btn-main" style="background:#444">NO ERROR</button><button onclick="window.mostrarInputError()" class="btn-main" style="background:var(--atm-red)">SÍ, ERROR</button></div><div id="div-error-detalle" style="display:none; margin-top:15px;"><input type="text" id="gol-error-detalle" placeholder="Detalle..."><button onclick="window.registrarGolContra(true)" class="btn-main">Confirmar</button></div></div></div>
     
@@ -190,17 +215,14 @@
             <span class="material-symbols-outlined">groups</span>
             <span>Porteros</span>
         </button>
-        
         <button onclick="window.cambiarSeccion('partidos')" id="btn-partidos" class="fab-center">
             <span class="material-symbols-outlined" style="font-size: 34px;">sports_soccer</span>
         </button>
-        
         <button onclick="window.cambiarSeccion('conceptos')" id="btn-conceptos" class="nav-item">
             <span class="material-symbols-outlined">tune</span>
             <span>Conceptos</span>
         </button>
     </nav>
-    
     <div id="printable-area" class="printable-hidden"></div>
     
     <script src="app.js"></script>
