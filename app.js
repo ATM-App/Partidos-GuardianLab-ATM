@@ -22,19 +22,13 @@ const auth = firebase.auth();
 // HELPERS DB
 function dbSave(storeName, data) {
     const id = String(data.id || Date.now());
-    return db.collection(storeName).doc(id).set(data)
-        .then(() => true)
-        .catch(err => { console.error("Error guardando:", err); return false; });
+    return db.collection(storeName).doc(id).set(data).then(() => true).catch(err => { console.error(err); return false; });
 }
-
 function dbGetAll(storeName) {
     return db.collection(storeName).get().then(snap => {
-        const list = [];
-        snap.forEach(doc => list.push(doc.data()));
-        return list;
-    }).catch(err => { console.error("Error leyendo:", err); return []; });
+        const list = []; snap.forEach(doc => list.push(doc.data())); return list;
+    }).catch(err => { console.error(err); return []; });
 }
-
 function dbDelete(storeName, id) {
     return db.collection(storeName).doc(String(id)).delete().catch(err => console.error(err));
 }
@@ -45,34 +39,28 @@ let accionTemporal = null;
 let porteroEnEdicionId = null;
 let partidoEnEdicion = null;
 
-// CATÁLOGOS BASE
+// CATÁLOGOS BASE (El error visual estaba aquí: Se quitaron las palabras "PERSONALIZADAS" de los arrays)
 let CATALOGO_ACCIONES = {
-    "DEFENSIVAS": { id: "def", grupos: { "BLOCAJES": ["Blocaje Frontal Raso", "Blocaje Lateral Raso", "Blocaje Frontal Media Altura", "Blocaje Lateral Media Altura", "Blocaje Aéreo"], "DESVÍOS": ["Desvío Mano Natural", "Desvío Mano Cambiada", "Desvío 2 Manos"], "JUEGO AÉREO": ["Despeje 1 Puño", "Despeje 2 Puños", "Prolongación"], "1 VS 1": ["Reducción de Espacios", "Posición Cruz", "Apertura", "Caída Lateral"], "OTRAS": ["Rechace", "PERSONALIZADAS"] } },
-    "OFENSIVAS": { id: "of", grupos: { "PASES CON LA MANO": ["Pase Mano Raso", "Pase Mano Alto", "Pase Mano Picado"], "PASES CON PIE": ["Volea", "Pase Corto", "Pase Largo", "Despeje", "Despeje Orientado"], "CONTINUIDAD": ["Perfil + Control + Pase Corto", "Perfil + Control + Pase Largo", "Largo Control Previo", "Largo en Movimiento"], "OTRAS": ["PERSONALIZADAS"] } },
-    "TÁCTICAS": { id: "tac", grupos: { "POSICIONAMIENTO": ["Posición y Bisectriz", "Visión de Juego", "Saltar Líneas", "Posición Fase Ofensiva", "Posición Fase Defensiva", "Barrera"], "COMUNICACIÓN": ["Comunicación Verbal", "Comunicación NO Verbal"], "CONSTRUCCIÓN": ["Pase Espalda Defensa", "Desmarque de Apoyo"], "OTRAS": ["PERSONALIZADAS"] } },
-    "REINCORPORACIONES": { id: "rein", grupos: { "TIPOS": ["A Posición Básica", "A Mismo Lado", "A Lado Contrario", "Tras Blocaje"], "OTRAS": ["PERSONALIZADAS"] } }
+    "DEFENSIVAS": { id: "def", grupos: { "BLOCAJES": ["Blocaje Frontal Raso", "Blocaje Lateral Raso", "Blocaje Frontal Media Altura", "Blocaje Lateral Media Altura", "Blocaje Aéreo"], "DESVÍOS": ["Desvío Mano Natural", "Desvío Mano Cambiada", "Desvío 2 Manos"], "JUEGO AÉREO": ["Despeje 1 Puño", "Despeje 2 Puños", "Prolongación"], "1 VS 1": ["Reducción de Espacios", "Posición Cruz", "Apertura", "Caída Lateral"], "OTRAS": ["Rechace"], "PERSONALIZADAS": [] } },
+    "OFENSIVAS": { id: "of", grupos: { "PASES CON LA MANO": ["Pase Mano Raso", "Pase Mano Alto", "Pase Mano Picado"], "PASES CON PIE": ["Volea", "Pase Corto", "Pase Largo", "Despeje", "Despeje Orientado"], "CONTINUIDAD": ["Perfil + Control + Pase Corto", "Perfil + Control + Pase Largo", "Largo Control Previo", "Largo en Movimiento"], "PERSONALIZADAS": [] } },
+    "TÁCTICAS": { id: "tac", grupos: { "POSICIONAMIENTO": ["Posición y Bisectriz", "Visión de Juego", "Saltar Líneas", "Posición Fase Ofensiva", "Posición Fase Defensiva", "Barrera"], "COMUNICACIÓN": ["Comunicación Verbal", "Comunicación NO Verbal"], "CONSTRUCCIÓN": ["Pase Espalda Defensa", "Desmarque de Apoyo"], "PERSONALIZADAS": [] } },
+    "REINCORPORACIONES": { id: "rein", grupos: { "TIPOS": ["A Posición Básica", "A Mismo Lado", "A Lado Contrario", "Tras Blocaje"], "PERSONALIZADAS": [] } }
 };
 
 let categoriaAccionActiva = "DEFENSIVAS";
 
 // --- INICIO ---
 document.addEventListener('DOMContentLoaded', () => {
-    
     auth.onAuthStateChanged((user) => {
         if (user) {
             cargarPorteros();
             cargarPartidosHistorial();
             cargarConceptosPersonalizados();
         } else {
-            auth.signInAnonymously().catch((error) => {
-                console.error("Error de conexión segura:", error.code, error.message);
-                alert("Error de conexión. Revisa tu internet.");
-            });
+            auth.signInAnonymously().catch(err => alert("Error de conexión. Revisa tu internet."));
         }
     });
-
     recuperarPartidoEnCurso();
-    
     const today = new Date().toISOString().split('T')[0];
     const fConf = document.getElementById('conf-fecha'); if(fConf) fConf.value=today;
     
@@ -91,6 +79,8 @@ window.alternarTema = function() { document.body.classList.toggle('light-mode');
 window.cambiarSeccion = function(sec) {
     document.getElementById('modal-pdf-preview').style.display = 'none';
     document.getElementById('modal-fin-partido').style.display = 'none';
+    
+    // Solo mostramos/ocultamos las secciones de la versión nueva
     ['porteros','partidos','conceptos','live'].forEach(id => {
         const secEl = document.getElementById('section-'+id);
         const btnEl = document.getElementById('btn-'+id);
@@ -120,6 +110,7 @@ function cargarConceptosPersonalizados() {
         const listDiv = document.getElementById('lista-conceptos-custom');
         if(listDiv) listDiv.innerHTML = '';
 
+        // Reset
         CATALOGO_ACCIONES["DEFENSIVAS"].grupos["PERSONALIZADAS"] = [];
         CATALOGO_ACCIONES["OFENSIVAS"].grupos["PERSONALIZADAS"] = [];
         CATALOGO_ACCIONES["TÁCTICAS"].grupos["PERSONALIZADAS"] = [];
@@ -145,6 +136,11 @@ function cargarConceptosPersonalizados() {
                 }
             }
         });
+        
+        // Re-renderizar si estamos viendo el panel de botones
+        if(document.getElementById('section-live').style.display === 'block') {
+            window.renderizarPanelAcciones();
+        }
     });
 }
 
@@ -286,7 +282,7 @@ window.actualizarUI = function() {
     if(!partidoLive.porteroActualId) return;
     document.getElementById('live-portero-nombre').innerText = "Cargando...";
     db.collection("porteros").doc(String(partidoLive.porteroActualId)).get().then(doc => {
-        if(doc.exists) { const p = doc.data(); document.getElementById('live-portero-nombre').innerText = p.nombre; document.getElementById('live-portero-foto').src = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIwIDIxdi0yYTQgNCAwIDAgMC00LTRoLThhNCA0IDAgMCAwLTQgNHYyIi8+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0Ii8+PC9zdmc+"; }
+        if(doc.exists) { const p = doc.data(); document.getElementById('live-portero-nombre').innerText = p.nombre; document.getElementById('live-portero-foto').src = p.foto || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4="; }
     });
 }
 window.controlCrono = function(act) {
@@ -317,14 +313,13 @@ window.controlCrono = function(act) {
 }
 window.updCrono = function() { const m = Math.floor(partidoLive.crono.seg/60); const s = partidoLive.crono.seg%60; document.getElementById('crono').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
 
-// NUEVA FUNCIÓN: DESHACER ÚLTIMA ACCIÓN
+// FUNCIÓN DESHACER
 window.deshacerUltimaAccion = function() {
     if (partidoLive.acciones.length === 0) return alert("No hay acciones registradas para deshacer.");
     
-    if (confirm("¿Seguro que quieres deshacer el último registro?")) {
-        const ultima = partidoLive.acciones.pop(); // Saca la última acción
+    if (confirm("¿Deshacer el último registro?")) {
+        const ultima = partidoLive.acciones.pop(); 
 
-        // Revertir el marcador si la última acción era un gol
         if (ultima.tipo === 'GOL_FAVOR') {
             partidoLive.marcador.local = Math.max(0, partidoLive.marcador.local - 1);
             document.getElementById('score-local').innerText = partidoLive.marcador.local;
@@ -333,7 +328,6 @@ window.deshacerUltimaAccion = function() {
             document.getElementById('score-rival').innerText = partidoLive.marcador.rival;
         }
 
-        // Re-renderizar la cronología visual
         const log = document.getElementById('live-log');
         log.innerHTML = '';
         partidoLive.acciones.forEach(ev => {
@@ -367,13 +361,25 @@ window.renderizarPanelAcciones = function() {
     const tabs = document.createElement('div'); tabs.className='tabs-container';
     Object.keys(CATALOGO_ACCIONES).forEach(k => { const btn = document.createElement('button'); btn.innerText = k; btn.className = `tab-btn ${categoriaAccionActiva===k?'active':''}`; btn.dataset.cat = CATALOGO_ACCIONES[k].id; btn.onclick = () => { categoriaAccionActiva = k; window.renderizarPanelAcciones(); }; tabs.appendChild(btn); });
     panel.appendChild(tabs);
-    const gr = CATALOGO_ACCIONES[categoriaAccionActiva].grupos; const catId = CATALOGO_ACCIONES[categoriaAccionActiva].id;
+    
+    const gr = CATALOGO_ACCIONES[categoriaAccionActiva].grupos; 
+    const catId = CATALOGO_ACCIONES[categoriaAccionActiva].id;
+    
     Object.keys(gr).forEach(gName => {
-        const tit = document.createElement('div'); tit.className='action-group-title'; tit.innerText=gName; panel.appendChild(tit);
-        const grid = document.createElement('div'); grid.className='actions-grid-new';
         let acciones = gr[gName];
-        acciones.forEach(act => { const b = document.createElement('button'); b.innerText=act; b.className=`action-btn-new btn-${catId}`; b.onclick = () => window.prepararAccion(act); grid.appendChild(b); });
-        panel.appendChild(grid);
+        // SOLO DIBUJA EL GRUPO SI TIENE ACCIONES (Evita que salga "PERSONALIZADAS" vacío)
+        if (acciones && acciones.length > 0) {
+            const tit = document.createElement('div'); tit.className='action-group-title'; tit.innerText=gName; panel.appendChild(tit);
+            const grid = document.createElement('div'); grid.className='actions-grid-new';
+            acciones.forEach(act => { 
+                const b = document.createElement('button'); 
+                b.innerText=act; 
+                b.className=`action-btn-new btn-${catId}`; 
+                b.onclick = () => window.prepararAccion(act); 
+                grid.appendChild(b); 
+            });
+            panel.appendChild(grid);
+        }
     });
 }
 window.prepararAccion = function(n) { if(!partidoLive.crono.run) return alert("Crono parado"); accionTemporal = n; document.getElementById('accion-titulo').innerText = n; document.getElementById('modal-accion').style.display='flex'; }
