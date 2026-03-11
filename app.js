@@ -39,7 +39,7 @@ let accionTemporal = null;
 let porteroEnEdicionId = null;
 let partidoEnEdicion = null;
 
-// CATÁLOGOS BASE (El error visual estaba aquí: Se quitaron las palabras "PERSONALIZADAS" de los arrays)
+// CATÁLOGOS BASE
 let CATALOGO_ACCIONES = {
     "DEFENSIVAS": { id: "def", grupos: { "BLOCAJES": ["Blocaje Frontal Raso", "Blocaje Lateral Raso", "Blocaje Frontal Media Altura", "Blocaje Lateral Media Altura", "Blocaje Aéreo"], "DESVÍOS": ["Desvío Mano Natural", "Desvío Mano Cambiada", "Desvío 2 Manos"], "JUEGO AÉREO": ["Despeje 1 Puño", "Despeje 2 Puños", "Prolongación"], "1 VS 1": ["Reducción de Espacios", "Posición Cruz", "Apertura", "Caída Lateral"], "OTRAS": ["Rechace"], "PERSONALIZADAS": [] } },
     "OFENSIVAS": { id: "of", grupos: { "PASES CON LA MANO": ["Pase Mano Raso", "Pase Mano Alto", "Pase Mano Picado"], "PASES CON PIE": ["Volea", "Pase Corto", "Pase Largo", "Despeje", "Despeje Orientado"], "CONTINUIDAD": ["Perfil + Control + Pase Corto", "Perfil + Control + Pase Largo", "Largo Control Previo", "Largo en Movimiento"], "PERSONALIZADAS": [] } },
@@ -80,7 +80,6 @@ window.cambiarSeccion = function(sec) {
     document.getElementById('modal-pdf-preview').style.display = 'none';
     document.getElementById('modal-fin-partido').style.display = 'none';
     
-    // Solo mostramos/ocultamos las secciones de la versión nueva
     ['porteros','partidos','conceptos','live'].forEach(id => {
         const secEl = document.getElementById('section-'+id);
         const btnEl = document.getElementById('btn-'+id);
@@ -91,7 +90,9 @@ window.cambiarSeccion = function(sec) {
     const destEl = document.getElementById('section-'+sec);
     if(destEl) destEl.style.display = 'block';
     
-    const btnDest = document.getElementById('btn-'+sec);
+    // Activar botón en el dock
+    let realBtnId = sec === 'live' ? 'btn-partidos' : 'btn-'+sec;
+    const btnDest = document.getElementById(realBtnId);
     if(btnDest) btnDest.classList.add('active');
     
     const banner = document.getElementById('live-match-banner');
@@ -131,13 +132,12 @@ function cargarConceptosPersonalizados() {
                 if(listDiv) {
                     listDiv.innerHTML += `<div class="item-temp-eval" style="display:flex;justify-content:space-between;align-items:center;">
                         <div><strong>${c.nombre}</strong><br><span style="font-size:0.7em;color:#aaa">${labelType}</span></div>
-                        <button class="btn-trash" onclick="borrarConcepto('${doc.id}')">🗑️</button>
+                        <button class="btn-trash" onclick="borrarConcepto('${doc.id}')"><span class="material-symbols-outlined">delete</span></button>
                     </div>`;
                 }
             }
         });
         
-        // Re-renderizar si estamos viendo el panel de botones
         if(document.getElementById('section-live').style.display === 'block') {
             window.renderizarPanelAcciones();
         }
@@ -183,7 +183,7 @@ function cargarPorteros() {
         c.innerHTML = '';
         const def = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48cGF0aCBkPSJNMTIgOGEzIDMgMCAxIDAgMCA2IDMgMyAwIDAgMCAwLTZ6bS01IDlsMTAgMGE3IDcgMCAwIDEtMTAgMHoiLz48L3N2Zz4=";
         lista.forEach(p => {
-            c.innerHTML += `<div class="portero-card"><div style="display:flex; align-items:center;"><img src="${p.foto||def}" class="mini-foto-list"><div><div class="card-title">${p.nombre}</div><div class="card-subtitle">${p.equipo} (${p.anio||'-'})</div></div></div><div><button class="btn-icon-action" onclick="window.cargarDatosEdicion('${p.id}')">✏️</button><button class="btn-trash" onclick="window.borrarPortero('${p.id}')">🗑️</button></div></div>`;
+            c.innerHTML += `<div class="portero-card"><div style="display:flex; align-items:center;"><img src="${p.foto||def}" class="mini-foto-list"><div><div class="card-title">${p.nombre}</div><div class="card-subtitle">${p.equipo} (${p.anio||'-'})</div></div></div><div><button class="btn-icon-action" onclick="window.cargarDatosEdicion('${p.id}')"><span class="material-symbols-outlined" style="font-size: 18px;">edit</span></button><button class="btn-trash" onclick="window.borrarPortero('${p.id}')"><span class="material-symbols-outlined" style="font-size: 20px;">delete</span></button></div></div>`;
         });
         const opts = '<option value="">Seleccionar...</option>' + lista.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
         const confSelect = document.getElementById('conf-portero-titular');
@@ -305,15 +305,15 @@ window.controlCrono = function(act) {
             }
         }, 1000);
         partidoLive.parteActual = (act === 'start') ? '1ª Parte' : '2ª Parte'; window.regEv('HITO', partidoLive.parteActual);
+        document.getElementById('live-parte-txt').innerText = partidoLive.parteActual;
     }
-    if(act === 'fin1' || act === 'fin') { clearInterval(c.int); c.run = false; c.savedSeg = c.seg; partidoLive.parteActual = (act === 'fin1') ? 'Descanso' : 'Final'; window.regEv('HITO', partidoLive.parteActual); if(act === 'fin') window.abrirModalFin(); }
+    if(act === 'fin1' || act === 'fin') { clearInterval(c.int); c.run = false; c.savedSeg = c.seg; partidoLive.parteActual = (act === 'fin1') ? 'Descanso' : 'Final'; window.regEv('HITO', partidoLive.parteActual); document.getElementById('live-parte-txt').innerText = partidoLive.parteActual; if(act === 'fin') window.abrirModalFin(); }
     guardarEstadoLive();
     ['btn-start-partido','btn-fin-1','btn-ini-2','btn-fin-partido'].forEach(i=>document.getElementById(i).style.display='none');
     if(act==='start') document.getElementById('btn-fin-1').style.display='block'; if(act==='fin1') document.getElementById('btn-ini-2').style.display='block'; if(act==='ini2') document.getElementById('btn-fin-partido').style.display='block';
 }
 window.updCrono = function() { const m = Math.floor(partidoLive.crono.seg/60); const s = partidoLive.crono.seg%60; document.getElementById('crono').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
 
-// FUNCIÓN DESHACER
 window.deshacerUltimaAccion = function() {
     if (partidoLive.acciones.length === 0) return alert("No hay acciones registradas para deshacer.");
     
@@ -367,7 +367,6 @@ window.renderizarPanelAcciones = function() {
     
     Object.keys(gr).forEach(gName => {
         let acciones = gr[gName];
-        // SOLO DIBUJA EL GRUPO SI TIENE ACCIONES (Evita que salga "PERSONALIZADAS" vacío)
         if (acciones && acciones.length > 0) {
             const tit = document.createElement('div'); tit.className='action-group-title'; tit.innerText=gName; panel.appendChild(tit);
             const grid = document.createElement('div'); grid.className='actions-grid-new';
@@ -453,7 +452,7 @@ function recuperarPartidoEnCurso() {
             window.actualizarUI();
             if(st.crono.run) {
                 st.crono.int = setInterval(() => { const now = Date.now(); const diff = Math.floor((now - st.crono.startTs)/1000); st.crono.seg = st.crono.savedSeg + diff; window.updCrono(); if(st.porteroActualId) { const delta = (now - st.crono.lastUpdate)/1000; if(delta > 0) { if(!st.minutosJugados[st.porteroActualId]) st.minutosJugados[st.porteroActualId] = 0; st.minutosJugados[st.porteroActualId] += delta; st.crono.lastUpdate = now; } } }, 1000);
-            } else { window.updCrono(); }
+            } else { window.updCrono(); document.getElementById('live-parte-txt').innerText = st.parteActual; }
             ['btn-start-partido','btn-fin-1','btn-ini-2','btn-fin-partido'].forEach(i=>document.getElementById(i).style.display='none');
             if(st.parteActual === 'Pre-Partido') document.getElementById('btn-start-partido').style.display='block'; else if(st.parteActual === '1ª Parte') document.getElementById('btn-fin-1').style.display='block'; else if(st.parteActual === 'Descanso') document.getElementById('btn-ini-2').style.display='block'; else if(st.parteActual === '2ª Parte') document.getElementById('btn-fin-partido').style.display='block';
             window.renderizarPanelAcciones();
@@ -501,7 +500,7 @@ window.imprimirPDFNativo = function() { window.print(); }
 function cargarPartidosHistorial() {
     db.collection("partidos").orderBy("timestamp", "desc").onSnapshot(snap => {
         const c = document.getElementById('lista-partidos'); c.innerHTML = '';
-        snap.forEach(doc => { const p = doc.data(); c.innerHTML += `<div class="match-card"><div><div class="card-title">${p.equipo} vs ${p.rival} (${p.res})</div><div class="card-subtitle">${p.fecha}</div></div><div><button class="btn-icon-action" onclick="window.abrirEdicionAnalisis('${doc.id}')">✏️</button><button class="btn-icon-action" onclick="window.verPDFHistorial('${doc.id}')">📄</button><button class="btn-icon-action" onclick="window.borrarHistorial('${doc.id}')">🗑️</button></div></div>`; });
+        snap.forEach(doc => { const p = doc.data(); c.innerHTML += `<div class="match-card"><div><div class="card-title">${p.equipo} vs ${p.rival} (${p.res})</div><div class="card-subtitle">${p.fecha}</div></div><div><button class="btn-icon-action" onclick="window.abrirEdicionAnalisis('${doc.id}')"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button><button class="btn-icon-action" onclick="window.verPDFHistorial('${doc.id}')"><span class="material-symbols-outlined" style="font-size:18px;">description</span></button><button class="btn-icon-action" onclick="window.borrarHistorial('${doc.id}')"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></div></div>`; });
         const liveBanner = document.getElementById('live-match-banner'); 
         if(partidoLive.parteActual !== 'Pre-Partido' && partidoLive.parteActual !== 'Final'){ liveBanner.style.display = 'block'; } else { liveBanner.style.display = 'none'; }
     });
