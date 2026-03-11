@@ -115,9 +115,9 @@
                 <div class="row" style="align-items: center;">
                     <div style="flex:1; display:flex; align-items:center; gap:15px;">
                         <img id="live-portero-foto" src="" class="mini-foto-live">
-                        <div style="display:flex; flex-direction:column;">
-                            <span id="live-portero-nombre" style="font-weight:800; color:var(--atm-red); font-size:1.1rem;">Portero</span>
-                            <span id="live-minutos" class="badge-minutes">⏱️ 0'</span>
+                        <div style="display:flex; flex-direction:column; gap:5px;">
+                            <span id="live-portero-nombre" style="font-weight:800; color:var(--atm-red); font-size:1.15rem; line-height: 1;">Portero</span>
+                            <span id="live-minutos" class="badge-minutes"><span class="material-symbols-outlined" style="font-size:16px;">timer</span> 0'</span>
                         </div>
                     </div>
                 </div>
@@ -149,7 +149,7 @@
             <div class="modern-card form-card">
                 <p style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">Añade nuevas acciones para evaluar en el Partido en Vivo.</p>
                 <div class="row">
-                    <input type="text" id="new-concepto-nombre" placeholder="Nombre (ej: Pase con el pecho)" style="flex:2">
+                    <input type="text" id="new-concepto-nombre" placeholder="Nombre (ej: Salida de puños)" style="flex:2">
                     <select id="new-concepto-tipo" style="flex:2">
                         <option value="LIVE_DEF">Defensivas</option>
                         <option value="LIVE_OF">Ofensivas</option>
@@ -190,8 +190,7 @@
         </div>
     </div>
     
-    <div id="modal-cambio" class="modal">
-        <div class="modal-content modern-card" style="text-align:center;">
+    <div id="modal-cambio" class="modal"><div class="modal-content modern-card" style="text-align:center;">
             <span class="close-btn" onclick="window.cerrarModal('modal-cambio')">&times;</span>
             <h3 style="color:var(--atm-red); margin-bottom:15px;">Seleccionar Suplente</h3>
             
@@ -199,8 +198,7 @@
                 </div>
             
             <button onclick="window.confirmarCambio()" class="btn-main" style="background:var(--atm-blue)" id="btn-conf-cambio" disabled>Confirmar Cambio</button>
-        </div>
-    </div>
+    </div></div>
     
     <div id="modal-gol-rival" class="modal"><div class="modal-content modern-card" style="border-color: #ffaa00;"><h3>Gol en Contra</h3><div class="row"><button onclick="window.registrarGolContra(false)" class="btn-main" style="background:#444">NO ERROR</button><button onclick="window.mostrarInputError()" class="btn-main" style="background:var(--atm-red)">SÍ, ERROR</button></div><div id="div-error-detalle" style="display:none; margin-top:15px;"><input type="text" id="gol-error-detalle" placeholder="Detalle..."><button onclick="window.registrarGolContra(true)" class="btn-main">Confirmar</button></div></div></div>
     
@@ -223,6 +221,7 @@
             <span>Conceptos</span>
         </button>
     </nav>
+    
     <div id="printable-area" class="printable-hidden"></div>
     
     <script src="app.js"></script>
